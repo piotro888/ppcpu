@@ -37,33 +37,28 @@ always @(posedge i_clk) begin
         o_instr <= `I_SIZE'b0;
         o_req_active <= 1'b0;
         hold_valid <= 1'b0;
-    end else begin
+    end else if (i_req_data_valid & i_next_ready) begin
+        // memory request completed, submit instruction
+        o_instr <= i_req_data;
+        fetch_pc <= next_fetch_pc;
+        o_submit <= 1'b1;
+        // always request new instruction, address is computed comb
+        o_req_active <= 1'b1;
+    end else if(i_req_data_valid & ~i_next_ready) begin
+        hold_instr <= i_req_data;
+        hold_valid <= 1'b1;
+        o_req_active <= 1'b0;
         o_submit <= 1'b0;
-        if(i_req_data_valid) begin
-            // memory request completed, submit instruction
-            if(i_next_ready) begin
-                o_instr <= i_req_data;
-                fetch_pc <= next_fetch_pc;
-                o_submit <= 1'b1;
-
-                // always request new instruction, address is computed comb
-                o_req_active <= 1'b1;
-            end else begin
-                hold_instr <= i_req_data;
-                hold_valid <= 1'b1;
-                o_req_active <= 1'b0;
-            end
-        end else if(hold_valid & i_next_ready) begin
-            // submit holded instruction when next stage is ready
-            o_instr <= hold_instr;
-            fetch_pc <= next_fetch_pc;
-            o_submit <= 1'b1;
-            hold_valid <= 1'b0;
-            o_req_active <= 1'b1;
-        end else begin
-            o_req_active <= 1'b1;
-        end
-        
+    end else if(hold_valid & i_next_ready) begin
+        // submit holded instruction when next stage is ready
+        o_instr <= hold_instr;
+        fetch_pc <= next_fetch_pc;
+        o_submit <= 1'b1;
+        hold_valid <= 1'b0;
+        o_req_active <= 1'b1;
+    end else begin
+        o_req_active <= 1'b1;
+        o_submit <= 1'b0;
     end
 end
 
