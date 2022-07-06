@@ -8,3 +8,5 @@
 
 `define ADDR_W 16
 `define EXT_ADDR_W 24
+
+`define I_SIZE 32
