@@ -16,7 +16,7 @@ int instructions[] = {0, 0xffff, 0x5000e, 0xfffe, 0xfffd, 0x8010e /*pred not tak
 std::vector <int> exp_ins = {0, 0xffff, 0x5000e, 0x8010e, 0xfffa, 0x7000e, 0x7000e};
 
 void sim_mem(Vfetch* d) {
-    if(!d->i_clk)
+    if(d->i_clk)
         return;
     
     d->i_req_data_valid = 0;
@@ -35,13 +35,19 @@ void sim_mem(Vfetch* d) {
 }
 
 void sim_cpu(Vfetch* d) {
-    if(!d->i_clk)
+    if(d->i_clk)
         return;
     
     if(d->o_submit) {
+        assert(d->i_next_ready);
         std::cout<<"PIPE "<<std::hex<<d->o_instr<<"(fetch_pc: "<<d->rootp->fetch__DOT__fetch_pc<<")\n";
         res_ins.push_back(d->o_instr);
     }
+
+    if(!d->i_next_ready)
+        std::cout<<"(NR)";
+
+    d->i_next_ready = rand()%2;
 }
 
 void tick(Vfetch *dut, VerilatedVcdC* vcd) {
@@ -66,6 +72,9 @@ int main() {
         tick(dut, v_vcd);
     dut->i_rst = 0;
 
+    srand(1);
+    dut->i_next_ready = 1;
+
     while (sim_time < MAX_SIM_TIME) {
         // simulate external devices
         sim_mem(dut);
@@ -81,11 +90,12 @@ int main() {
     v_vcd->close();
     delete dut;
 
+    std::cout<<'\n';
     // verify
     for(int i=0; i<exp_ins.size(); i++) {
         assert(res_ins.size() > i);
         assert(res_ins[i] == exp_ins[i]);
     }
 
-    std::cout<<"\n\nfetch test passed\n";
+    std::cout<<"\nfetch test passed\n";
 }
