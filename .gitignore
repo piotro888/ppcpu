@@ -1,0 +1,6 @@
+
+obj_dir/
+*.vcd
+
+.vscode/
+*.code-workspace
