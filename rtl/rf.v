@@ -10,13 +10,17 @@ module rf (
     
     input [`RW-1:0] i_d,
     output [`RW-1:0] o_lout,
-    output [`RW-1:0] o_rout
+    output [`RW-1:0] o_rout,
+
+    output [`RW-1:0] dbg_r0
 );
 
 wire [`RW-1:0] reg_outputs [`REGNO-1:0];
 
 assign o_lout = reg_outputs[i_lout_sel];
 assign o_rout = reg_outputs[i_rout_sel];
+
+assign dbg_r0 = reg_outputs[0];
 
 genvar i;
 generate
@@ -33,18 +37,18 @@ endgenerate
 
 endmodule
 
-module register (
+module register #(parameter N = `RW) (
     input i_clk,
     input i_rst,
 
-    input [`RW-1:0] i_d,
-    output reg [`RW-1:0] o_d,
+    input [N-1:0] i_d,
+    output reg [N-1:0] o_d,
     input i_ie 
 );
 
 always @(posedge i_clk) begin
     if (i_rst)
-        o_d <= `RW'b0;
+        o_d <= 0;
     else if (i_ie)
         o_d <= i_d;
 end
