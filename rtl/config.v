@@ -10,3 +10,22 @@
 `define EXT_ADDR_W 24
 
 `define I_SIZE 32
+
+// -- ALU --
+`define ALU_MODE_W 4
+`define ALU_MODE_L_PASS `ALU_MODE_W'b0
+`define ALU_MODE_R_PASS `ALU_MODE_W'b1
+`define ALU_MODE_ADD `ALU_MODE_W'b10
+`define ALU_MODE_SUB `ALU_MODE_W'b11
+`define ALU_MODE_AND `ALU_MODE_W'b100
+`define ALU_MODE_OR `ALU_MODE_W'b101
+`define ALU_MODE_XOR `ALU_MODE_W'b110
+`define ALU_MODE_SHL `ALU_MODE_W'b111
+`define ALU_MODE_SHR `ALU_MODE_W'b1000
+`define ALU_FLAG_W 3
+`define ALU_FLAG_CNT 5
+`define ALU_FLAG_Z `ALU_FLAG_W'b0
+`define ALU_FLAG_C `ALU_FLAG_W'b1
+`define ALU_FLAG_N `ALU_FLAG_W'b10
+`define ALU_FLAG_O `ALU_FLAG_W'b11
+`define ALU_FLAG_P `ALU_FLAG_W'b100
