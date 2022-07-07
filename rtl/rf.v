@@ -4,6 +4,7 @@ module rf (
     input i_clk,
     input i_rst,
 
+    input i_gie,
     input [`REGNO-1:0] i_ie,
     input [`REGNO_LOG-1:0] i_lout_sel,
     input [`REGNO_LOG-1:0] i_rout_sel,
@@ -29,7 +30,7 @@ generate
             .i_clk(i_clk),
             .i_rst(i_rst),
             .i_d(i_d),
-            .i_ie(i_ie[i]),
+            .i_ie(i_ie[i] & i_gie),
             .o_d(reg_outputs[i])
         );
     end

@@ -10,6 +10,7 @@ module decode (
 
     // Pipeline control
     input i_next_ready,
+    input i_submit,
     output o_ready,
     output o_submit,
 
@@ -127,25 +128,39 @@ end
 
 
 // PIPELINE WRAPPER
+reg input_valid;
 always @(posedge i_clk) begin
-    // pc reset values?
-    if (i_next_ready & ~i_rst) begin
-        o_submit <= 1'b1;
-
-        o_imm_pass <= i_imm_pass;
-        // Submit control signals
-        oc_pc_inc <= c_pc_inc;
-        oc_pc_ie <= c_pc_ie; 
-        oc_r_bus_imm <= c_r_bus_imm;
-        oc_alu_carry_en <= c_alu_carry_en;
-        oc_alu_flags_ie <= c_alu_flags_ie;
-        oc_rf_ie <= c_rf_ie;
-        oc_alu_mode <= c_alu_mode;
-        oc_l_reg_sel <= c_l_reg_sel;
-        oc_r_reg_sel <= c_r_reg_sel;
-    end else
+    if(i_rst) begin
         o_submit <= 1'b0;
-    o_ready <= i_next_ready & ~i_rst;
+        o_ready <= 1'b1;
+        input_valid <= 1'b0;
+    end else begin
+        // default bubble
+        o_submit <= 1'b0;
+
+        if (i_next_ready & (i_submit | input_valid) & ~i_rst) begin
+            o_submit <= 1'b1;
+            o_ready <= 1'b1;
+            input_valid <= 1'b0;
+
+            o_imm_pass <= i_imm_pass;
+            // Submit control signals
+            oc_pc_inc <= c_pc_inc;
+            oc_pc_ie <= c_pc_ie; 
+            oc_r_bus_imm <= c_r_bus_imm;
+            oc_alu_carry_en <= c_alu_carry_en;
+            oc_alu_flags_ie <= c_alu_flags_ie;
+            oc_rf_ie <= c_rf_ie;
+            oc_alu_mode <= c_alu_mode;
+            oc_l_reg_sel <= c_l_reg_sel;
+            oc_r_reg_sel <= c_r_reg_sel;
+        end
+
+        if (i_submit & ~i_next_ready) begin
+            o_ready <= 1'b0; // don't overwrite buffer
+            input_valid <= 1'b1;
+        end
+    end
 end
 
 

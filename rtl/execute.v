@@ -6,6 +6,8 @@ module execute (
 
     // Pipeline control singnals
     output reg o_ready,
+    // don't modify state when submit is not set - pipeline bubble
+    input i_submit,
 
     input [`RW-1:0] i_imm,
 
@@ -41,17 +43,17 @@ assign dbg_pc = pc_val;
 // Submodules
 rf rf(.i_clk(i_clk), .i_rst(i_rst), .i_d(alu_bus), .o_lout(reg_l_con),
     .o_rout(reg_r_con), .i_lout_sel(c_l_reg_sel), .i_rout_sel(c_r_reg_sel),
-    .i_ie(c_rf_ie), .dbg_r0(dbg_r0));
+    .i_ie(c_rf_ie), .i_gie(i_submit), .dbg_r0(dbg_r0));
 
 alu alu(.i_l(alu_l_bus), .i_r(alu_r_bus), .o_out(alu_bus), .i_mode(c_alu_mode), 
     .o_flags(alu_flags_d), .i_carry(alu_flags_q[`ALU_FLAG_C] & c_alu_carry_en));
 
-pc pc(.i_clk(i_clk), .i_rst(i_rst), .i_bus(alu_bus), .i_c_pc_inc(c_pc_inc), 
-    .i_c_pc_ie(c_pc_ie), .o_pc(pc_val));
+pc pc(.i_clk(i_clk), .i_rst(i_rst), .i_bus(alu_bus), .i_c_pc_inc(c_pc_inc & i_submit), 
+    .i_c_pc_ie(c_pc_ie & i_submit), .o_pc(pc_val));
 
 // Cpu control registers
 register  #(.N(`ALU_FLAG_CNT)) alu_flag_reg (.i_clk(i_clk), .i_rst(i_rst), 
-    .i_d(alu_flags_d), .o_d(alu_flags_q), .i_ie(c_alu_flags_ie));
+    .i_d(alu_flags_d), .o_d(alu_flags_q), .i_ie(c_alu_flags_ie & i_submit));
 
 endmodule;
 

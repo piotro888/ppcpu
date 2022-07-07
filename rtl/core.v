@@ -40,13 +40,13 @@ decode decode(.i_clk(i_clk), .i_rst(i_rst), .o_ready(fetch_decode_next_ready), .
     .i_next_ready(decode_execute_next_ready), .i_instr_l(fetch_decode_d_instr[15:0]), .i_imm_pass(fetch_decode_d_instr[`I_SIZE-1:16]),
     .o_imm_pass(de_imm_pass), .oc_pc_inc(dec_pc_inc), .oc_pc_ie(dec_pc_ie), .oc_r_bus_imm(dec_r_bus_imm), .oc_alu_mode(dec_alu_mode),
     .oc_alu_flags_ie(dec_alu_flags_ie), .oc_alu_carry_en(dec_alu_carry_en), .oc_l_reg_sel(dec_l_reg_sel), .oc_r_reg_sel(dec_r_reg_sel),
-    .oc_rf_ie(dec_rf_ie));
+    .oc_rf_ie(dec_rf_ie), .i_submit(fetch_decode_submit));
 
 // Pipeline stage 2 - EXECUTE
 execute execute(.i_clk(i_clk), .i_rst(i_rst), .o_ready(decode_execute_next_ready), .i_imm(de_imm_pass), .c_pc_inc(dec_pc_inc),
     .c_pc_ie(dec_pc_ie), .c_r_bus_imm(dec_r_bus_imm), .c_alu_mode(dec_alu_mode), .c_alu_flags_ie(dec_alu_flags_ie), 
     .c_alu_carry_en(dec_alu_carry_en), .c_l_reg_sel(dec_l_reg_sel), .c_r_reg_sel(dec_r_reg_sel), .c_rf_ie(dec_rf_ie), 
-    .dbg_pc(dbg_pc), .dbg_r0(dbg_r0));
+    .dbg_pc(dbg_pc), .dbg_r0(dbg_r0), .i_submit(decode_execute_submit));
 
 endmodule
 
