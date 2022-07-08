@@ -13,18 +13,23 @@ module fetch (
     
     input i_next_ready,
     output reg o_submit,
+    input i_flush,
+ 
+    output reg [`I_SIZE-1:0] o_instr,
+    output reg o_jmp_predict,
 
-    output reg [`I_SIZE-1:0] o_instr
+    input [`RW-1:0] i_exec_pc
 );
 
 reg [`I_SIZE-1:0] hold_instr; // buffer if output is not ready
 reg hold_valid;
 
 reg [`RW-1:0] fetch_pc, next_fetch_pc;
+reg next_branch_pred;
+assign o_jmp_predict = next_branch_pred;
+reg invalidate_request;
 wire [`RW-1:0] instr_imm = o_instr[31:16];
 
-// when req_data_valid is set (and new pc is not yet ready), memory is not 
-// accepting requests and it starts on next cycle
 // halt loop opt: disable req and submit current instruction
 // NOTE: don't do prediction on srs 0 and iret
 
@@ -33,10 +38,23 @@ assign o_req_addr = next_fetch_pc;
 always @(posedge i_clk) begin
     if(i_rst) begin
         fetch_pc <= -`RW'b1; // start from addr 0
-        o_submit<= 1'b0; // wait until first requst is completed
+        o_submit <= 1'b0; // wait until first requst is completed
         o_instr <= `I_SIZE'b0;
         o_req_active <= 1'b0;
         hold_valid <= 1'b0;
+        invalidate_request <= 1'b0;
+    end else if (i_flush) begin
+        // invalidate everything on flush
+        o_submit <= 1'b0;
+        hold_valid <= 1'b0;
+        // read new correct pc (-1 to fetch correct one) and start request
+        fetch_pc <= i_exec_pc - `RW'b1;
+        o_instr <= `I_SIZE'b0; // ensure +1 pred
+        invalidate_request <= o_req_active;
+    end else if (i_req_data_valid & invalidate_request) begin
+        invalidate_request <= 1'b0;
+        o_req_active <= 1'b1;
+        o_submit <= 1'b0;
     end else if (i_req_data_valid & i_next_ready) begin
         // memory request completed, submit instruction
         o_instr <= i_req_data;
@@ -68,20 +86,25 @@ always @(*) begin
         if (o_instr[10:7] == 4'h0) begin
             // unconditional jump
             next_fetch_pc = instr_imm;
+            next_branch_pred = 1'b1;
         end else begin
             // try to predict jump
             if (fetch_pc > instr_imm) begin
                 // back jump (taken)
                 next_fetch_pc = instr_imm;
+                next_branch_pred = 1'b1;
             end else begin
                 // forward jump (not taken)
                 next_fetch_pc = fetch_pc + `RW'b1;
+                next_branch_pred = 1'b0;
             end
         end
     end else if (o_instr[6:0] == 7'h0f) begin
         next_fetch_pc = instr_imm;
+        next_branch_pred = 1'b1;
     end else begin
         next_fetch_pc = fetch_pc + `RW'b1;
+        next_branch_pred = 1'b0;
     end
 end
 

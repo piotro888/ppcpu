@@ -7,12 +7,15 @@ module decode (
     input [15:0] i_instr_l,
     input [`I_SIZE-17:0] i_imm_pass,
     output reg [`I_SIZE-17:0] o_imm_pass,
+    input i_jmp_pred_pass,
+    output o_jmp_pred_pass,
 
     // Pipeline control
     input i_next_ready,
     input i_submit,
     output o_ready,
     output o_submit,
+    input i_flush,
 
     output reg oc_pc_inc, oc_pc_ie,
     output reg oc_r_bus_imm,
@@ -150,12 +153,13 @@ always @(posedge i_clk) begin
         // default bubble
         o_submit <= 1'b0;
 
-        if (i_next_ready & (i_submit | input_valid) & ~i_rst) begin
+        if (i_next_ready & (i_submit | input_valid) & ~i_flush) begin
             o_submit <= 1'b1;
             o_ready <= 1'b1;
             input_valid <= 1'b0;
 
             o_imm_pass <= i_imm_pass;
+            o_jmp_pred_pass <= i_jmp_pred_pass;
             // Submit control signals
             oc_pc_inc <= c_pc_inc;
             oc_pc_ie <= c_pc_ie; 
@@ -169,10 +173,16 @@ always @(posedge i_clk) begin
             oc_jump_cond_code <= c_jump_cond_code;
         end
 
-        if (i_submit & ~i_next_ready) begin
+        if (i_submit & ~i_next_ready & ~i_flush) begin
             o_ready <= 1'b0; // don't overwrite buffer
             input_valid <= 1'b1;
         end
+
+        if (i_flush) begin
+            o_submit <= 1'b0;
+            o_ready <= 1'b1;
+            input_valid <= 1'b0;
+        end 
     end
 end
 
