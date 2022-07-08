@@ -16,14 +16,17 @@ bool sim_mem(Vcore* d, std::vector<int>& instr, bool randt=false) {
     
     d->i_req_data_valid = 0;
     if(d->o_req_active && !d->i_req_data_valid) {
-        // TODO: randomize request times
+        static int req_addr = -1;
+        if(!req_time)
+            req_addr = d->o_req_addr;
+        
         if(++req_time >= (randt ? (rand()%3)+1 : 2)) {
             req_time = 0;
             d->i_req_data_valid = 1;
-            if (d->o_req_addr >= instr.size()) {
+            if (req_addr >= instr.size()) {
                 d->i_req_data = 0; // NOP
             } else {
-                d->i_req_data = instr[d->o_req_addr];
+                d->i_req_data = instr[req_addr];
             }
             std::cout<<"REQF "<<std::hex<<d->o_req_addr<<" r:"<<d->i_req_data<<"\n";
         }

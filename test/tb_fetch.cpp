@@ -21,15 +21,18 @@ void sim_mem(Vfetch* d) {
     
     d->i_req_data_valid = 0;
     if(d->o_req_active && !d->i_req_data_valid) {
-        if(!req_time)
+        static int req_addr = -1;
+        if(!req_time) {
             std::cout<<"NREQ "<<d->o_req_addr<<'\n';
+            req_addr = d->o_req_addr;
+        }
         
         if(++req_time == 3) {
             req_time = 0;
             d->i_req_data_valid = 1;
-            assert(d->o_req_addr < 8);
-            d->i_req_data = instructions[d->o_req_addr];
-            std::cout<<"REQF "<<d->o_req_addr<<" r:"<<d->i_req_data<<"\n";
+            assert(req_addr < 8);
+            d->i_req_data = instructions[req_addr];
+            std::cout<<"REQF "<<req_addr<<" r:"<<d->i_req_data<<"\n";
         }
     }
 }
@@ -74,6 +77,7 @@ int main() {
 
     srand(1);
     dut->i_next_ready = 1;
+    dut->i_flush = 0;
 
     while (sim_time < MAX_SIM_TIME) {
         // simulate external devices
