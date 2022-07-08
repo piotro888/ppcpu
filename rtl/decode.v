@@ -19,7 +19,8 @@ module decode (
     output reg [`ALU_MODE_W-1:0] oc_alu_mode,
     output reg oc_alu_carry_en, oc_alu_flags_ie,
     output reg [`REGNO_LOG-1:0] oc_l_reg_sel, oc_r_reg_sel, 
-    output reg [`REGNO-1:0] oc_rf_ie
+    output reg [`REGNO-1:0] oc_rf_ie,
+    output reg [`JUMP_CODE_W-1:0] oc_jump_cond_code
 );
 
 // COMBINATIONAL INSTRUCTION DECODER
@@ -48,6 +49,7 @@ reg [`ALU_MODE_W-1:0] c_alu_mode;
 reg c_alu_carry_en, c_alu_flags_ie;
 reg [`REGNO_LOG-1:0] c_l_reg_sel, c_r_reg_sel; 
 reg [`REGNO-1:0] c_rf_ie;
+reg [`JUMP_CODE_W-1:0] c_jump_cond_code;
 
 always @(*) begin
     // defaults
@@ -57,6 +59,7 @@ always @(*) begin
     c_alu_mode = `ALU_MODE_W'b0;
     c_l_reg_sel = `REGNO_LOG'b0;
     c_r_reg_sel = `REGNO_LOG'b0;
+    c_jump_cond_code = `JUMP_CODE_W'b0;
     
     case (opcode)
         `OPC_NOP: begin
@@ -120,7 +123,16 @@ always @(*) begin
             c_r_bus_imm = 1'b1;
             c_alu_flags_ie = 1'b1;
         end
-        // NOTE: Conditional jumps should receive taken/not from fetch stage or decoded in ex.
+        `OPC_JMP: begin
+            // NOTE: Conditional jumps are decoded in execute stage
+            // to not unnecessarily stall the pipeline each time prediction
+            // is taken
+            c_pc_inc = 1'b0;
+            c_pc_ie = 1'b0;
+            c_alu_mode = `ALU_MODE_R_PASS;
+            c_r_bus_imm = 1'b1;
+            c_jump_cond_code = {1'b1, i_instr_l[10:7]};
+        end
         default: begin
         end
     endcase
@@ -154,6 +166,7 @@ always @(posedge i_clk) begin
             oc_alu_mode <= c_alu_mode;
             oc_l_reg_sel <= c_l_reg_sel;
             oc_r_reg_sel <= c_r_reg_sel;
+            oc_jump_cond_code <= c_jump_cond_code;
         end
 
         if (i_submit & ~i_next_ready) begin

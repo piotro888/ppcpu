@@ -29,3 +29,7 @@
 `define ALU_FLAG_N `ALU_FLAG_W'b10
 `define ALU_FLAG_O `ALU_FLAG_W'b11
 `define ALU_FLAG_P `ALU_FLAG_W'b100
+
+// -- SHARED DECODE --
+`define JUMP_CODE_W 5 // 4+1
+`define JUMP_CODE_BIT_EN 4
