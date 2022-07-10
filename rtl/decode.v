@@ -23,14 +23,19 @@ module decode (
     output reg oc_alu_carry_en, oc_alu_flags_ie,
     output reg [`REGNO_LOG-1:0] oc_l_reg_sel, oc_r_reg_sel, 
     output reg [`REGNO-1:0] oc_rf_ie,
-    output reg [`JUMP_CODE_W-1:0] oc_jump_cond_code
+    output reg [`JUMP_CODE_W-1:0] oc_jump_cond_code,
+    output reg oc_mem_access, oc_mem_we
 );
 
 // COMBINATIONAL INSTRUCTION DECODER
 
 `define OPC_NOP 7'h0
 `define OPC_MOV 7'h1
+`define OPC_LDD 7'h2
+`define OPC_LDO 7'h3
 `define OPC_LDI 7'h4
+`define OPC_STD 7'h5
+`define OPC_STO 7'h6
 `define OPC_ADD 7'h7
 `define OPC_ADI 7'h8
 `define OPC_ADC 7'h9
@@ -53,11 +58,13 @@ reg c_alu_carry_en, c_alu_flags_ie;
 reg [`REGNO_LOG-1:0] c_l_reg_sel, c_r_reg_sel; 
 reg [`REGNO-1:0] c_rf_ie;
 reg [`JUMP_CODE_W-1:0] c_jump_cond_code;
+reg c_mem_access, c_mem_we;
 
 always @(*) begin
     // defaults
     c_pc_inc = 1'b1;
-    {c_pc_ie, c_r_bus_imm, c_alu_carry_en, c_alu_flags_ie} = 4'b0;
+    {c_pc_ie, c_r_bus_imm, c_alu_carry_en, c_alu_flags_ie, c_mem_access,
+        c_mem_we} = 6'b0;
     c_rf_ie = `REGNO'b0;
     c_alu_mode = `ALU_MODE_W'b0;
     c_l_reg_sel = `REGNO_LOG'b0;
@@ -72,10 +79,38 @@ always @(*) begin
             c_l_reg_sel = reg_st;
             c_rf_ie[reg_dst] = 1'b1;
         end
+        `OPC_LDD: begin
+            c_r_bus_imm = 1'b1;
+            c_alu_mode = `ALU_MODE_R_PASS;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_mem_access = 1'b1;
+        end
+        `OPC_LDO: begin
+            c_l_reg_sel = reg_st;
+            c_r_bus_imm = 1'b1;
+            c_alu_mode = `ALU_MODE_ADD;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_mem_access = 1'b1;
+        end
         `OPC_LDI: begin
             c_alu_mode = `ALU_MODE_R_PASS;
             c_r_bus_imm = 1'b1;
             c_rf_ie[reg_dst] = 1'b1;
+        end
+        `OPC_STD: begin
+            c_r_bus_imm = 1'b1;
+            c_alu_mode = `ALU_MODE_R_PASS;
+            c_r_reg_sel = reg_st;
+            c_mem_access = 1'b1;
+            c_mem_we = 1'b1;
+        end
+        `OPC_STO: begin
+            c_l_reg_sel = reg_nd;
+            c_r_bus_imm = 1'b1;
+            c_alu_mode = `ALU_MODE_ADD;
+            c_r_reg_sel = reg_st;
+            c_mem_access = 1'b1;
+            c_mem_we = 1'b1;
         end
         `OPC_ADD: begin
             c_alu_mode = `ALU_MODE_ADD;
@@ -171,6 +206,8 @@ always @(posedge i_clk) begin
             oc_l_reg_sel <= c_l_reg_sel;
             oc_r_reg_sel <= c_r_reg_sel;
             oc_jump_cond_code <= c_jump_cond_code;
+            oc_mem_access <= c_mem_access;
+            oc_mem_we <= c_mem_we;
         end
 
         if (i_submit & ~i_next_ready & ~i_flush) begin

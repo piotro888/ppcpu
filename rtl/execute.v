@@ -21,17 +21,28 @@ module execute (
     input [`REGNO_LOG-1:0] c_l_reg_sel, c_r_reg_sel, 
     input [`REGNO-1:0] c_rf_ie,
     input [`JUMP_CODE_W-1:0] c_jump_cond_code,
+    input c_mem_access, c_mem_we,
 
     // Signals to fetch stage to handle mispredictions
     output o_pc_update,
     output [`RW-1:0] o_exec_pc,
 
     // Debug outputs
-    output [`RW-1:0] dbg_r0, dbg_pc
+    output [`RW-1:0] dbg_r0, dbg_pc,
+
+    // Pipeline next stage
+    output reg [`RW-1:0] o_data,
+    output reg[`RW-1:0] o_addr,
+    output reg [`REGNO-1:0] o_reg_ie,
+    output reg o_mem_access, o_mem_we,
+    output reg o_submit,
+    input i_next_ready,
+    input [`REGNO-1:0] i_reg_ie,
+    input [`RW-1:0] i_reg_data
 );
 
-// separate memory access stage?
-assign o_ready = 1'b1; // for now this stage is always read (no mem)
+// TODO: detect RAW hazards
+assign o_ready = i_next_ready;
 
 // don't update state when current instruction is not valid (flush or bubble)
 wire valid = i_submit & ~i_flush;
@@ -53,9 +64,9 @@ assign o_pc_update = valid;
 assign o_exec_pc = pc_val;
 
 // Submodules
-rf rf(.i_clk(i_clk), .i_rst(i_rst), .i_d(alu_bus), .o_lout(reg_l_con),
+rf rf(.i_clk(i_clk), .i_rst(i_rst), .i_d(i_reg_data), .o_lout(reg_l_con),
     .o_rout(reg_r_con), .i_lout_sel(c_l_reg_sel), .i_rout_sel(c_r_reg_sel),
-    .i_ie(c_rf_ie), .i_gie(valid), .dbg_r0(dbg_r0));
+    .i_ie(i_reg_ie), .i_gie(valid), .dbg_r0(dbg_r0));
 
 alu alu(.i_l(alu_l_bus), .i_r(alu_r_bus), .o_out(alu_bus), .i_mode(c_alu_mode), 
     .o_flags(alu_flags_d), .i_carry(alu_flags_q[`ALU_FLAG_C] & c_alu_carry_en));
@@ -112,6 +123,22 @@ always @(*) begin
         default:
             jump_dec_en = 1'b0;
     endcase
+end
+
+// Forwarding to next pipeline stage
+always @(posedge i_clk) begin
+    if (i_rst) begin
+        o_submit <= 1'b0;
+    end else if (i_next_ready & valid) begin
+        o_addr <= alu_bus;
+        o_data <= (c_mem_access ? reg_r_con : alu_bus); 
+        o_reg_ie <= c_rf_ie;
+        o_mem_access <= c_mem_access;
+        o_mem_we <= c_mem_we;
+        o_submit <= 1'b1;
+    end else begin
+        o_submit <= 1'b0;
+    end
 end
 
 endmodule

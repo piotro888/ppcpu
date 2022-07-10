@@ -7,10 +7,9 @@ module memwb (
 
     input [`RW-1:0] i_data,
     input [`RW-1:0] i_addr,
-    input [`REGNO_LOG-1:0] i_dst_reg,
+    input [`REGNO-1:0] i_reg_ie,
     input i_mem_access,
     input i_mem_we,
-    input i_reg_we,
 
     output [`REGNO-1:0] o_reg_ie,
     output [`RW-1:0] o_reg_data,
@@ -32,8 +31,8 @@ assign o_mem_data = i_data;
 assign o_mem_addr = i_addr;
 assign o_mem_we = i_mem_we;
 
-wire reg_ie = (i_mem_access & i_mem_ack & ~i_mem_we) | (i_reg_we & i_submit);
-assign o_reg_ie = {7'b0, reg_ie} << i_dst_reg;
+wire reg_ie = ((i_mem_access & i_mem_ack) | (~i_mem_access & i_submit)) & (|i_reg_ie);
+assign o_reg_ie = (reg_ie ? i_reg_ie : `REGNO'b0);
 
 assign o_ready = ~o_mem_req | (o_mem_req & i_mem_ack);
 
