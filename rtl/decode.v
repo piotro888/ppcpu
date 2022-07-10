@@ -8,13 +8,13 @@ module decode (
     input [`I_SIZE-17:0] i_imm_pass,
     output reg [`I_SIZE-17:0] o_imm_pass,
     input i_jmp_pred_pass,
-    output o_jmp_pred_pass,
+    output reg o_jmp_pred_pass,
 
     // Pipeline control
     input i_next_ready,
     input i_submit,
-    output o_ready,
-    output o_submit,
+    output reg o_ready,
+    output reg o_submit,
     input i_flush,
 
     output reg oc_pc_inc, oc_pc_ie,

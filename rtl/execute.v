@@ -5,7 +5,7 @@ module execute (
     input i_rst,
 
     // Pipeline control singnals
-    output reg o_ready,
+    output o_ready,
     input i_submit,
     output reg o_flush,
     input i_flush,
@@ -114,7 +114,8 @@ always @(*) begin
     endcase
 end
 
-endmodule;
+endmodule
 
 `include "alu.v"
 `include "rf.v"
+`include "pc.v"
