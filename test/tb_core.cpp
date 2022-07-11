@@ -28,7 +28,7 @@ bool sim_mem(Vcore* d, std::vector<int>& instr, bool randt=false) {
             } else {
                 d->i_req_data = instr[req_addr];
             }
-            std::cout<<"REQF "<<std::hex<<d->o_req_addr<<" r:"<<d->i_req_data<<"\n";
+            std::cout<<"REQF "<<std::hex<<req_addr<<" r:"<<d->i_req_data<<"\n";
         }
     }
     return true;
@@ -48,6 +48,7 @@ void cpu_reset(Vcore* dut, VerilatedVcdC* v_vcd) {
     for(int i=0; i<4; i++)
         tick(dut, v_vcd);
     dut->i_rst = 0;
+    req_time = 0;
 }
 
 bool test_simple (Vcore* dut, VerilatedVcdC* v_vcd) {
@@ -60,7 +61,7 @@ bool test_simple (Vcore* dut, VerilatedVcdC* v_vcd) {
      * adi r0, r0, 1
      * sub r0, r0, r1
      */
-    std::vector <int> instr = {0, 0x00010004, 0x00020084, 0x00002007, 0x00000007, 0x00010008, 0x0000200A};
+    std::vector <int> instr = {0, 0x00010004, 0x00020084, 0x00002007, 0x00000007, 0x00010008, 0x0000200A, 0x0, 0x0};
     while (sim_time < MAX_SIM_TIME) {
         // simulate external devices
         if(!sim_mem(dut, instr, true))

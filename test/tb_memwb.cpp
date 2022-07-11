@@ -71,10 +71,9 @@ void submit_request(Vmemwb* dut, VerilatedVcdC* vcd, int addr, int reg, int data
         tick(dut, vcd);
     
     dut->i_addr = addr;
-    dut->i_dst_reg = reg;
+    dut->i_reg_ie = ((mem && !we) || (!mem && we) ? (1<<reg) : 0);
     dut->i_data = data;
     dut->i_mem_access = mem;
-    dut->i_reg_we = we && !mem;
     dut->i_mem_we = we && mem;
     dut->i_submit = 1;
     tick(dut, vcd);
