@@ -13,7 +13,7 @@ module decode (
     // Pipeline control
     input i_next_ready,
     input i_submit,
-    output reg o_ready,
+    output o_ready,
     output reg o_submit,
     input i_flush,
 
@@ -179,10 +179,13 @@ end
 
 // PIPELINE WRAPPER
 reg input_valid;
+
+// ready signal must be combinational to be registered on time by previous stage
+assign o_ready = i_next_ready;
+
 always @(posedge i_clk) begin
     if(i_rst) begin
         o_submit <= 1'b0;
-        o_ready <= 1'b1;
         input_valid <= 1'b0;
     end else begin
         // default bubble
@@ -190,7 +193,6 @@ always @(posedge i_clk) begin
 
         if (i_next_ready & (i_submit | input_valid) & ~i_flush) begin
             o_submit <= 1'b1;
-            o_ready <= 1'b1;
             input_valid <= 1'b0;
 
             o_imm_pass <= i_imm_pass;
@@ -211,13 +213,11 @@ always @(posedge i_clk) begin
         end
 
         if (i_submit & ~i_next_ready & ~i_flush) begin
-            o_ready <= 1'b0; // don't overwrite buffer
-            input_valid <= 1'b1;
+            input_valid <= 1'b1; // don't overwrite buffer
         end
 
         if (i_flush) begin
             o_submit <= 1'b0;
-            o_ready <= 1'b1;
             input_valid <= 1'b0;
         end 
     end

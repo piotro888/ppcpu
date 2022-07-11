@@ -77,6 +77,9 @@ always @(posedge i_clk) begin
     end else if (~hold_valid) begin // don't overwrite hold
         o_req_active <= 1'b1;
         o_submit <= 1'b0;
+    end else begin
+        o_req_active <= 1'b0;
+        o_submit <= 1'b0;
     end
 end
 
