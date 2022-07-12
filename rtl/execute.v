@@ -42,9 +42,11 @@ module execute (
     input [`RW-1:0] i_reg_data
 );
 
+reg next_ready_delayed;
 // detect RAW pipeline hazard
 wire raw_hazard = ((c_used_operands[0] & o_reg_ie[c_l_reg_sel]) |
-    (c_used_operands[1] & o_reg_ie[c_r_reg_sel])) & (o_submit | ~i_next_ready);
+    (c_used_operands[1] & o_reg_ie[c_r_reg_sel])) & (o_submit | ~next_ready_delayed);
+// hazard happens also in the first cycle when next_ready becomes high, delayed signal is used 
 
 wire i_invalidate = i_flush;
 // hazard doesn't invalidate instructions, only holds it
@@ -66,6 +68,14 @@ always @(posedge i_clk) begin
         hold_valid <= 1'b0;
     end else if (i_valid) begin
         hold_valid <= 1'b1;
+    end
+end
+
+always @(posedge i_clk) begin
+    if(i_rst) begin
+        next_ready_delayed <= 1'b0;
+    end else begin
+        next_ready_delayed <= i_next_ready;
     end
 end
 
