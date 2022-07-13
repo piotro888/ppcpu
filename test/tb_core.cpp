@@ -1,4 +1,5 @@
 #include "Vcore.h"
+#include "Vcore___024root.h"
 
 #include <iostream>
 #include <verilated_vcd_c.h>
@@ -208,7 +209,60 @@ bool test_mem_access(Vcore* dut, VerilatedVcdC* vcd) {
     }
     std::cout<<"test_mem_access passed\n";
     return true;
+}
 
+bool test_sreg0(Vcore* dut, VerilatedVcdC* vcd) {
+    cpu_reset(dut,vcd);
+    /* listing:
+    ldi r0, 2
+    srl r1, 0
+    cmi r1, 1
+    jne err
+    ldi r1, 8
+    srs r1, 0
+    err:
+    ldi r0, 4
+    jmp err
+    ;pc = 8
+    ldi r0, 5
+    ldi r1, 9
+    srs r1, 0
+    */
+    std::vector <int> instr = {
+        0x0000020004,
+        0x0000000090,
+        0x000001040D,
+        0x000006038E,
+        0x0000080084,
+        0x0000000411,
+        0x0000040004,
+        0x000006000E,
+        0x0000050004,
+        0x0000090084,
+        0x0000000411,
+        0x0, 0x0, 0x0};
+    test_time = sim_time;
+    int end_it = 0;
+    while (sim_time-test_time < MAX_TEST_TIME) {
+        sim_mem(dut, instr);
+        sim_data_mem(dut);
+
+        tick(dut, vcd);
+
+        std::cout<<"r0:"<<dut->dbg_r0<<" pc:"<<dut->dbg_pc<<'\n';
+        
+        if(dut->dbg_pc == 0xa && dut->rootp->core__DOT__execute__DOT__exec_submit)
+            end_it++;
+        if(end_it >= 3)
+            break;
+    }
+    if(dut->dbg_r0 != 5) {
+        std::cout<<"test_sreg0 failed\n";
+        return false;
+    }
+    std::cout<<"test_sreg0 passed\n";
+    return true;
+    
 }
 
 int main() {
@@ -225,6 +279,7 @@ int main() {
     fail |= !test_simple(dut, v_vcd);
     fail |= !test_mispredict(dut, v_vcd);
     fail |= !test_mem_access(dut, v_vcd);
+    fail |= !test_sreg0(dut, v_vcd);
 
     dut->final();
     v_vcd->close();

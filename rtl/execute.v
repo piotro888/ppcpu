@@ -23,6 +23,7 @@ module execute (
     input [`JUMP_CODE_W-1:0] c_jump_cond_code,
     input c_mem_access, c_mem_we,
     input [1:0] c_used_operands,
+    input c_sreg_load, c_sreg_store,
 
     // Signals to fetch stage to handle mispredictions
     output o_pc_update,
@@ -94,6 +95,8 @@ wire [`ALU_FLAG_CNT-1:0] alu_flags_d, alu_flags_q;
 assign dbg_pc = pc_val;
 assign o_pc_update = exec_submit;
 assign o_exec_pc = pc_val;
+wire [`RW-1:0] sreg_in = reg_r_con;
+reg [`RW-1:0] sreg_out;
 
 // Submodules
 rf rf(.i_clk(i_clk), .i_rst(i_rst), .i_d(i_reg_data), .o_lout(reg_l_con),
@@ -103,8 +106,8 @@ rf rf(.i_clk(i_clk), .i_rst(i_rst), .i_d(i_reg_data), .o_lout(reg_l_con),
 alu alu(.i_l(alu_l_bus), .i_r(alu_r_bus), .o_out(alu_bus), .i_mode(c_alu_mode), 
     .o_flags(alu_flags_d), .i_carry(alu_flags_q[`ALU_FLAG_C] & c_alu_carry_en));
 
-pc pc(.i_clk(i_clk), .i_rst(i_rst), .i_bus(alu_bus), .i_c_pc_inc((c_pc_inc | (~jump_dec_en & jump_dec_valid)) & exec_submit), 
-    .i_c_pc_ie((c_pc_ie | (jump_dec_en & jump_dec_valid)) & exec_submit), .o_pc(pc_val));
+pc pc(.i_clk(i_clk), .i_rst(i_rst), .i_bus((c_sreg_store ? sreg_in : alu_bus)), .i_c_pc_inc((c_pc_inc | (~jump_dec_en & jump_dec_valid)) & exec_submit), 
+    .i_c_pc_ie((c_pc_ie | (jump_dec_en & jump_dec_valid) | pc_write) & exec_submit), .o_pc(pc_val));
 
 // Cpu control registers
 register  #(.N(`ALU_FLAG_CNT)) alu_flag_reg (.i_clk(i_clk), .i_rst(i_rst), 
@@ -115,9 +118,10 @@ reg jump_dec_en;
 wire jump_dec_valid = c_jump_cond_code[`JUMP_CODE_BIT_EN];
 
 wire jump_mispredict = jump_dec_valid & (jump_dec_en ^ i_jmp_predict);
+wire pc_write = pc_sreg_ie & c_sreg_store;
 
 always @(posedge i_clk) begin
-    o_flush <= jump_mispredict & exec_submit; // invalidate itself and all previous stages at next cycle
+    o_flush <= (jump_mispredict | pc_write) & exec_submit; // invalidate itself and all previous stages at next cycle
 end
 
 `define JUMP_CODE_UNCOND`JUMP_CODE_W'b10000
@@ -163,7 +167,7 @@ always @(posedge i_clk) begin
         o_submit <= 1'b0;
     end else if (exec_submit) begin
         o_addr <= alu_bus;
-        o_data <= (c_mem_access ? reg_r_con : alu_bus); 
+        o_data <= (c_mem_access ? reg_r_con : (c_sreg_load ? sreg_out : alu_bus)); 
         o_reg_ie <= c_rf_ie;
         o_mem_access <= c_mem_access;
         o_mem_we <= c_mem_we;
@@ -171,6 +175,18 @@ always @(posedge i_clk) begin
     end else begin
         o_submit <= 1'b0;
     end
+end
+
+// Special registers mux
+reg pc_sreg_ie;
+always @* begin
+    {pc_sreg_ie} = 1'b0;
+    case (i_imm)
+        default: begin
+            sreg_out = pc_val;
+            pc_sreg_ie = 1'b1;
+        end
+    endcase
 end
 
 endmodule

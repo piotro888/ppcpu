@@ -25,26 +25,29 @@ module decode (
     output reg [`REGNO-1:0] oc_rf_ie,
     output reg [`JUMP_CODE_W-1:0] oc_jump_cond_code,
     output reg oc_mem_access, oc_mem_we,
-    output reg [1:0] oc_used_operands
+    output reg [1:0] oc_used_operands,
+    output reg oc_sreg_load, oc_sreg_store
 );
 
 // COMBINATIONAL INSTRUCTION DECODER
 
-`define OPC_NOP 7'h0
-`define OPC_MOV 7'h1
-`define OPC_LDD 7'h2
-`define OPC_LDO 7'h3
-`define OPC_LDI 7'h4
-`define OPC_STD 7'h5
-`define OPC_STO 7'h6
-`define OPC_ADD 7'h7
-`define OPC_ADI 7'h8
-`define OPC_ADC 7'h9
-`define OPC_SUB 7'ha
-`define OPC_SUC 7'hb
-`define OPC_CMP 7'hc
-`define OPC_CMI 7'hd
-`define OPC_JMP 7'he
+`define OPC_NOP 7'h00
+`define OPC_MOV 7'h01
+`define OPC_LDD 7'h02
+`define OPC_LDO 7'h03
+`define OPC_LDI 7'h04
+`define OPC_STD 7'h05
+`define OPC_STO 7'h06
+`define OPC_ADD 7'h07
+`define OPC_ADI 7'h08
+`define OPC_ADC 7'h09
+`define OPC_SUB 7'h0a
+`define OPC_SUC 7'h0b
+`define OPC_CMP 7'h0c
+`define OPC_CMI 7'h0d
+`define OPC_JMP 7'h0e
+`define OPC_SRL 7'h10
+`define OPC_SRS 7'h11
 
 wire [6:0] opcode = i_instr_l[6:0];
 wire [2:0] reg_dst = i_instr_l[9:7];
@@ -61,12 +64,13 @@ reg [`REGNO-1:0] c_rf_ie;
 reg [`JUMP_CODE_W-1:0] c_jump_cond_code;
 reg c_mem_access, c_mem_we;
 reg [1:0] c_used_operands;
+reg c_sreg_load, c_sreg_store;
 
 always @(*) begin
     // defaults
     c_pc_inc = 1'b1;
     {c_pc_ie, c_r_bus_imm, c_alu_carry_en, c_alu_flags_ie, c_mem_access,
-        c_mem_we} = 6'b0;
+        c_mem_we, c_sreg_load, c_sreg_store} = 8'b0;
     c_rf_ie = `REGNO'b0;
     c_alu_mode = `ALU_MODE_W'b0;
     c_l_reg_sel = `REGNO_LOG'b0;
@@ -185,6 +189,15 @@ always @(*) begin
             c_r_bus_imm = 1'b1;
             c_jump_cond_code = {1'b1, i_instr_l[10:7]};
         end
+        `OPC_SRL: begin
+            c_sreg_load = 1'b1;
+            c_rf_ie[reg_dst] = 1'b1;
+        end
+        `OPC_SRS: begin
+            c_r_reg_sel = reg_st;
+            c_sreg_store = 1'b1;
+            c_used_operands = 2'b01;
+        end
         default: begin
         end
     endcase
@@ -225,6 +238,8 @@ always @(posedge i_clk) begin
             oc_mem_access <= c_mem_access;
             oc_mem_we <= c_mem_we;
             oc_used_operands <= c_used_operands;
+            oc_sreg_load <= c_sreg_load;
+            oc_sreg_store <= c_sreg_store;
         end
 
         if (i_submit & ~i_next_ready & ~i_flush) begin
