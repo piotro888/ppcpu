@@ -49,7 +49,7 @@ wire [`REGNO-1:0] dec_rf_ie;
 wire [`JUMP_CODE_W-1:0] dec_jump_cond_code;
 wire dec_mem_access, dec_mem_we;
 wire [1:0] dec_used_operands;
-wire dec_sreg_load, dec_sreg_store;
+wire dec_sreg_load, dec_sreg_store, dec_sreg_jal_over;
 
 // Pipeline stage 1 - DECODE
 decode decode(.i_clk(i_clk), .i_rst(i_rst), .o_ready(fetch_decode_next_ready), .o_submit(decode_execute_submit),
@@ -58,7 +58,7 @@ decode decode(.i_clk(i_clk), .i_rst(i_rst), .o_ready(fetch_decode_next_ready), .
     .oc_alu_flags_ie(dec_alu_flags_ie), .oc_alu_carry_en(dec_alu_carry_en), .oc_l_reg_sel(dec_l_reg_sel), .oc_r_reg_sel(dec_r_reg_sel),
     .oc_rf_ie(dec_rf_ie), .i_submit(fetch_decode_submit), .oc_jump_cond_code(dec_jump_cond_code), .i_jmp_pred_pass(fetch_decode_jmp_pred),
     .o_jmp_pred_pass(de_jmp_pred), .i_flush(fde_pipeline_flush), .oc_mem_access(dec_mem_access), .oc_mem_we(dec_mem_we),
-    .oc_used_operands(dec_used_operands), .oc_sreg_load(dec_sreg_load), .oc_sreg_store(dec_sreg_store));
+    .oc_used_operands(dec_used_operands), .oc_sreg_load(dec_sreg_load), .oc_sreg_store(dec_sreg_store), .oc_sreg_jal_over(dec_sreg_jal_over));
 
 wire [`RW-1:0] ew_data;
 wire [`RW-1:0] ew_addr;
@@ -77,7 +77,7 @@ execute execute(.i_clk(i_clk), .i_rst(i_rst), .o_ready(decode_execute_next_ready
     .o_exec_pc(execute_fetch_pc), .i_jmp_predict(de_jmp_pred), .i_flush(fde_pipeline_flush), .o_flush(fde_pipeline_flush), .c_mem_access(dec_mem_access),
     .c_mem_we(dec_mem_we), .o_data(ew_data), .o_addr(ew_addr), .o_reg_ie(ew_reg_ie), .o_mem_access(ew_mem_access), .o_mem_we(ew_mem_we), .o_submit(ew_submit),
     .i_next_ready(ew_next_ready), .i_reg_ie(we_reg_ie), .i_reg_data(we_reg_data), .c_used_operands(dec_used_operands), .c_sreg_load(dec_sreg_load),
-    .c_sreg_store(dec_sreg_store));
+    .c_sreg_store(dec_sreg_store), .c_sreg_jal_over(dec_sreg_jal_over));
 
 // Pipeline stage 3 - MEM&WB
 memwb memwb(.i_clk(i_clk), .i_rst(i_rst), .i_data(ew_data), .i_addr(ew_addr), .i_reg_ie(ew_reg_ie), .i_mem_access(ew_mem_access), .i_mem_we(ew_mem_we),

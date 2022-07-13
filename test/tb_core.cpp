@@ -225,6 +225,11 @@ bool test_sreg0(Vcore* dut, VerilatedVcdC* vcd) {
     jmp err
     ;pc = 8
     ldi r0, 5
+    jal r6, next
+    nop
+    next:
+    cmi r6, 10
+    jne err
     ldi r1, 9
     srs r1, 0
     */
@@ -238,7 +243,11 @@ bool test_sreg0(Vcore* dut, VerilatedVcdC* vcd) {
         0x0000040004,
         0x000006000E,
         0x0000050004,
-        0x0000090084,
+        0x00000B030F,
+        0x0000000000,
+        0x00000A180D,
+        0x000006038E,
+        0x00000D0084,
         0x0000000411,
         0x0, 0x0, 0x0};
     test_time = sim_time;
@@ -251,8 +260,12 @@ bool test_sreg0(Vcore* dut, VerilatedVcdC* vcd) {
 
         std::cout<<"r0:"<<dut->dbg_r0<<" pc:"<<dut->dbg_pc<<'\n';
         
-        if(dut->dbg_pc == 0xa && dut->rootp->core__DOT__execute__DOT__exec_submit)
+        if(dut->dbg_pc == 14 && dut->rootp->core__DOT__execute__DOT__exec_submit)
             end_it++;
+        if(dut->dbg_pc == 10) {
+            std::cout<<"test_sreg0 failed\n";
+            return false;
+        }
         if(end_it >= 3)
             break;
     }

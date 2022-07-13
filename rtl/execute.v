@@ -23,7 +23,7 @@ module execute (
     input [`JUMP_CODE_W-1:0] c_jump_cond_code,
     input c_mem_access, c_mem_we,
     input [1:0] c_used_operands,
-    input c_sreg_load, c_sreg_store,
+    input c_sreg_load, c_sreg_store, c_sreg_jal_over,
 
     // Signals to fetch stage to handle mispredictions
     output o_pc_update,
@@ -167,7 +167,9 @@ always @(posedge i_clk) begin
         o_submit <= 1'b0;
     end else if (exec_submit) begin
         o_addr <= alu_bus;
-        o_data <= (c_mem_access ? reg_r_con : (c_sreg_load ? sreg_out : alu_bus)); 
+        o_data <= (c_mem_access ? reg_r_con : 
+            (c_sreg_load | c_sreg_jal_over ? sreg_out + (c_sreg_jal_over ? `RW'b1 : `RW'b0) 
+                                            : alu_bus)); 
         o_reg_ie <= c_rf_ie;
         o_mem_access <= c_mem_access;
         o_mem_we <= c_mem_we;
@@ -187,6 +189,9 @@ always @* begin
             pc_sreg_ie = 1'b1;
         end
     endcase
+
+    if(c_sreg_jal_over)
+        sreg_out = pc_val;
 end
 
 endmodule
