@@ -38,7 +38,7 @@ endgenerate
 
 endmodule
 
-module register #(parameter N = `RW) (
+module register #(parameter N = `RW, parameter RESET_VAL = 0) (
     input i_clk,
     input i_rst,
 
@@ -49,7 +49,7 @@ module register #(parameter N = `RW) (
 
 always @(posedge i_clk) begin
     if (i_rst)
-        o_d <= 0;
+        o_d <= RESET_VAL;
     else if (i_ie)
         o_d <= i_d;
 end

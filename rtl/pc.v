@@ -7,12 +7,15 @@ module pc (
     input [`RW-1:0] i_bus,
 
     input i_c_pc_inc,
-    input i_c_pc_ie
+    input i_c_pc_ie,
+    input i_c_pc_irq
 );
 
 always @(posedge i_clk) begin
     if (i_rst) begin
         o_pc <= `RW'b0;
+    end else if (i_c_pc_irq) begin
+        o_pc <= `RW'b1;
     end else if (i_c_pc_ie) begin
         o_pc <= i_bus;
     end else if (i_c_pc_inc) begin

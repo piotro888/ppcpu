@@ -211,6 +211,107 @@ bool test_mem_access(Vcore* dut, VerilatedVcdC* vcd) {
     return true;
 }
 
+bool test_interupts(Vcore* dut, VerilatedVcdC* vcd) {
+    cpu_reset(dut, vcd);
+    srand(3);
+    /* listing
+        jmp start
+        jmp irq
+
+        start:
+        ldi r0, 0b101
+        srs r0, 1
+        ldi r0, 0
+        ldi r1, 0
+        ldi r2, 0x10
+        ; overcompicated counter to test functions under interrupts
+        loop:
+        adi r0, r0, 1
+
+        std r0, 2
+        ldi r0, 900
+        ldd r0, 2
+
+        cmi r0, 0
+        jge fwd_jmp
+        ldi r0, 800
+        fwd_jmp:
+
+        cmp r0, r2
+        jlt loop
+
+        jmp pass_ver
+
+        irq:
+        ; adi r1, r1, 1 ; commented out until arith flags are available as sr to save state
+        nop ; nop instruction will clear interrrupt in custom tb
+        irt
+
+        pass_ver: ; with r0 and r1 verification in tb
+        jmp pass_ver
+    */
+    std::vector <int> instr = {
+        0x0002000E,
+        0x0011000E,
+        0x00050004,
+        0x00010011,
+        0x00000004,
+        0x00000084,
+        0x00100104,
+        0x00010008,
+        0x00020005,
+        0x03840004,
+        0x00020002,
+        0x0000000D,
+        0x000E030E,
+        0x03200004,
+        0x0000400C,
+        0x0007018E,
+        0x0014000E,
+        //0x00010488,
+        0x00000000,
+        0x00000000,
+        0x0000001E,
+        0x0014000E};
+    
+    test_time = sim_time;
+    int irqc = 0;
+    while (sim_time-test_time < MAX_TEST_TIME*100) {
+        sim_mem(dut, instr);
+        sim_data_mem(dut);
+
+        if(rand() % 100 < 5 && !dut->i_irq) {
+            std::cout<<"irq";
+            irqc++;
+            dut->i_irq = 1;
+        }
+
+        tick(dut, vcd);
+
+        std::cout<<"r0:"<<dut->dbg_r0<<" pc:"<<dut->dbg_pc<<'\n';
+        
+        if(dut->dbg_pc == 18) {
+            std::cout<<"cli";
+            dut->i_irq = 0; // cli
+        }
+
+        if(dut->dbg_pc >= instr.size()-1) {
+            std::cout<<"end";
+            break;
+        }
+    }
+
+    int r0 = dut->dbg_r0;
+    int r1 = dut->rootp->core__DOT__execute__DOT__rf__DOT____Vcellout__rf_regs__BRA__1__KET____DOT__rf_reg__o_d;
+    std::cout<<"r0: "<<r0<<" r1: "<<r1<<'\n';
+    if(r0 != 0x10 /*|| r1 != irqc*/) {
+        std::cout<<"test_interrupt failed\n";
+        return false;
+    }
+    std::cout<<"test_interrupt passed\n";
+    return true;
+}
+
 int main() {
     Vcore *dut = new Vcore;
 
@@ -225,6 +326,7 @@ int main() {
     fail |= !test_simple(dut, v_vcd);
     fail |= !test_mispredict(dut, v_vcd);
     fail |= !test_mem_access(dut, v_vcd);
+    fail |= !test_interupts(dut, v_vcd);
     // Tests in assembly format are located in test/arch/, and are runned in basic core testbench
 
     dut->final();

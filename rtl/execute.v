@@ -23,7 +23,7 @@ module execute (
     input [`JUMP_CODE_W-1:0] c_jump_cond_code,
     input c_mem_access, c_mem_we,
     input [1:0] c_used_operands,
-    input c_sreg_load, c_sreg_store, c_sreg_jal_over,
+    input c_sreg_load, c_sreg_store, c_sreg_jal_over, c_sreg_irt,
 
     // Signals to fetch stage to handle mispredictions
     output o_pc_update,
@@ -40,7 +40,9 @@ module execute (
     output reg o_submit,
     input i_next_ready,
     input [`REGNO-1:0] i_reg_ie,
-    input [`RW-1:0] i_reg_data
+    input [`RW-1:0] i_reg_data,
+
+    input i_irq
 );
 
 reg next_ready_delayed;
@@ -49,7 +51,7 @@ wire raw_hazard = ((c_used_operands[0] & o_reg_ie[c_l_reg_sel]) |
     (c_used_operands[1] & o_reg_ie[c_r_reg_sel])) & (o_submit | ~next_ready_delayed);
 // hazard happens also in the first cycle when next_ready becomes high, delayed signal is used 
 
-wire i_invalidate = i_flush;
+wire i_invalidate = i_flush | irq;
 // hazard doesn't invalidate instructions, only holds it
 wire hold_req = raw_hazard;
 
@@ -61,6 +63,10 @@ wire exec_submit = i_next_ready & instr_valid & ~hold_req;
 
 // don't update state when current instruction is not valid (flush or bubble)
 assign o_ready = exec_submit | ~instr_valid;
+
+// At IRQ, current instruction (and state update) is invalidated and pc is saved to sr, to
+// continue execution from current instruction. Flush is requested on next cycle
+wire irq = i_irq & irq_en;
 
 always @(posedge i_clk) begin
     if(i_rst) begin
@@ -106,8 +112,9 @@ rf rf(.i_clk(i_clk), .i_rst(i_rst), .i_d(i_reg_data), .o_lout(reg_l_con),
 alu alu(.i_l(alu_l_bus), .i_r(alu_r_bus), .o_out(alu_bus), .i_mode(c_alu_mode), 
     .o_flags(alu_flags_d), .i_carry(alu_flags_q[`ALU_FLAG_C] & c_alu_carry_en));
 
-pc pc(.i_clk(i_clk), .i_rst(i_rst), .i_bus((c_sreg_store ? sreg_in : alu_bus)), .i_c_pc_inc((c_pc_inc | (~jump_dec_en & jump_dec_valid)) & exec_submit), 
-    .i_c_pc_ie((c_pc_ie | (jump_dec_en & jump_dec_valid) | pc_write) & exec_submit), .o_pc(pc_val));
+pc pc(.i_clk(i_clk), .i_rst(i_rst), .i_bus(c_sreg_store | c_sreg_irt ? (c_sreg_irt ? sreg_out : sreg_in) : alu_bus),
+    .i_c_pc_inc((c_pc_inc | (~jump_dec_en & jump_dec_valid)) & exec_submit), .i_c_pc_ie((c_pc_ie | (jump_dec_en & jump_dec_valid) | pc_write) & exec_submit),
+    .o_pc(pc_val), .i_c_pc_irq(irq));
 
 // Cpu control registers
 register  #(.N(`ALU_FLAG_CNT)) alu_flag_reg (.i_clk(i_clk), .i_rst(i_rst), 
@@ -118,10 +125,10 @@ reg jump_dec_en;
 wire jump_dec_valid = c_jump_cond_code[`JUMP_CODE_BIT_EN];
 
 wire jump_mispredict = jump_dec_valid & (jump_dec_en ^ i_jmp_predict);
-wire pc_write = pc_sreg_ie & c_sreg_store;
+wire pc_write = (pc_sreg_ie & c_sreg_store) | c_sreg_irt;
 
 always @(posedge i_clk) begin
-    o_flush <= (jump_mispredict | pc_write) & exec_submit; // invalidate itself and all previous stages at next cycle
+    o_flush <= ((jump_mispredict | pc_write) & exec_submit) | irq; // invalidate itself and all previous stages at next cycle
 end
 
 `define JUMP_CODE_UNCOND`JUMP_CODE_W'b10000
@@ -179,19 +186,54 @@ always @(posedge i_clk) begin
     end
 end
 
-// Special registers mux
-reg pc_sreg_ie;
+// Special registers
+`define SREG_PC `RW'b0
+`define SREG_PRIV_CTRL `RW'b1
+`define SREG_IRQ_PC `RW'b11
+
+reg pc_sreg_ie, sreg_priv_control_ie, sreg_irq_pc_ie;
+wire [`RW-1:0] sreg_priv_control_out, sreg_irq_pc_out;
 always @* begin
-    {pc_sreg_ie} = 1'b0;
+    {pc_sreg_ie, sreg_irq_pc_ie, sreg_priv_control_ie} = 3'b0;
     case (i_imm)
-        default: begin
+        `SREG_PC: begin
             sreg_out = pc_val;
-            pc_sreg_ie = 1'b1;
+            pc_sreg_ie = c_sreg_store;
         end
+        `SREG_PRIV_CTRL: begin
+            sreg_out = sreg_priv_control_out;
+            sreg_priv_control_ie = c_sreg_store;
+        end
+        `SREG_IRQ_PC: begin
+            sreg_out = sreg_irq_pc_out;
+            sreg_irq_pc_ie = c_sreg_store;
+        end
+        default:
+            sreg_out = 16'b0;
     endcase
 
     if(c_sreg_jal_over)
         sreg_out = pc_val;
+    if(c_sreg_irt)
+        sreg_out = sreg_irq_pc_out;
+end
+
+// Special registers control
+
+wire irq_en = sreg_priv_control_out[2], sreg_priv_mode = sreg_priv_control_out[0];
+register #(.RESET_VAL(`RW'b1)) sreg_priv_control (.i_clk(i_clk), .i_rst(i_rst), .i_d(priv_in), .o_d(sreg_priv_control_out),
+    .i_ie((((sreg_priv_control_ie & sreg_priv_mode) | c_sreg_irt) & exec_submit) | irq));
+
+register sreg_irq_pc (.i_clk(i_clk), .i_rst(i_rst), .i_d(pc_val), .o_d(sreg_irq_pc_out), .i_ie(irq | sreg_irq_pc_ie));
+
+reg [`RW-1:0] priv_in;
+always @* begin
+    if (irq) // clear irq_en flag on interrupt
+        priv_in = (sreg_priv_control_out & 16'hfffb);
+    else if (c_sreg_irt) // set irq_en on return from interrupt
+        priv_in = sreg_priv_control_out | 16'h0004;
+    else
+        priv_in = sreg_in;
 end
 
 endmodule
