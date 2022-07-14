@@ -117,8 +117,8 @@ pc pc(.i_clk(i_clk), .i_rst(i_rst), .i_bus(c_sreg_store | c_sreg_irt ? (c_sreg_i
     .o_pc(pc_val), .i_c_pc_irq(irq));
 
 // Cpu control registers
-register  #(.N(`ALU_FLAG_CNT)) alu_flag_reg (.i_clk(i_clk), .i_rst(i_rst), 
-    .i_d(alu_flags_d), .o_d(alu_flags_q), .i_ie(c_alu_flags_ie & exec_submit));
+register  #(.N(`ALU_FLAG_CNT)) alu_flag_reg (.i_clk(i_clk), .i_rst(i_rst), .i_d((alu_flags_sreg_ie ? sreg_in[`ALU_FLAG_CNT-1:0] : alu_flags_d)),
+    .o_d(alu_flags_q), .i_ie((c_alu_flags_ie | alu_flags_sreg_ie) & exec_submit));
 
 // JUMP DECODE
 reg jump_dec_en;
@@ -190,11 +190,12 @@ end
 `define SREG_PC `RW'b0
 `define SREG_PRIV_CTRL `RW'b1
 `define SREG_IRQ_PC `RW'b11
+`define SREG_ALU_FLAGS `RW'b100
 
-reg pc_sreg_ie, sreg_priv_control_ie, sreg_irq_pc_ie;
+reg pc_sreg_ie, sreg_priv_control_ie, sreg_irq_pc_ie, alu_flags_sreg_ie;
 wire [`RW-1:0] sreg_priv_control_out, sreg_irq_pc_out;
 always @* begin
-    {pc_sreg_ie, sreg_irq_pc_ie, sreg_priv_control_ie} = 3'b0;
+    {pc_sreg_ie, sreg_irq_pc_ie, sreg_priv_control_ie, alu_flags_sreg_ie} = 4'b0;
     case (i_imm)
         `SREG_PC: begin
             sreg_out = pc_val;
@@ -207,6 +208,10 @@ always @* begin
         `SREG_IRQ_PC: begin
             sreg_out = sreg_irq_pc_out;
             sreg_irq_pc_ie = c_sreg_store;
+        end
+        `SREG_ALU_FLAGS: begin
+            sreg_out = {11'b0, alu_flags_q};
+            alu_flags_sreg_ie = c_sreg_store;
         end
         default:
             sreg_out = 16'b0;

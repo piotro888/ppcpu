@@ -219,10 +219,10 @@ bool test_interupts(Vcore* dut, VerilatedVcdC* vcd) {
         jmp irq
 
         start:
+        ldi r1, 0
         ldi r0, 0b101
         srs r0, 1
         ldi r0, 0
-        ldi r1, 0
         ldi r2, 0x10
         ; overcompicated counter to test functions under interrupts
         loop:
@@ -243,7 +243,9 @@ bool test_interupts(Vcore* dut, VerilatedVcdC* vcd) {
         jmp pass_ver
 
         irq:
-        ; adi r1, r1, 1 ; commented out until arith flags are available as sr to save state
+        srl r3, 4
+        adi r1, r1, 1
+        srs r3, 4 ; recover arithemtic flags
         nop ; nop instruction will clear interrrupt in custom tb
         irt
 
@@ -253,10 +255,10 @@ bool test_interupts(Vcore* dut, VerilatedVcdC* vcd) {
     std::vector <int> instr = {
         0x0002000E,
         0x0011000E,
+        0x00000084,
         0x00050004,
         0x00010011,
         0x00000004,
-        0x00000084,
         0x00100104,
         0x00010008,
         0x00020005,
@@ -267,12 +269,13 @@ bool test_interupts(Vcore* dut, VerilatedVcdC* vcd) {
         0x03200004,
         0x0000400C,
         0x0007018E,
-        0x0014000E,
-        //0x00010488,
-        0x00000000,
+        0x0016000E,
+        0x00040190,
+        0x00010488,
+        0x00040C11,
         0x00000000,
         0x0000001E,
-        0x0014000E};
+        0x0016000E};
     
     test_time = sim_time;
     int irqc = 0;
@@ -280,18 +283,16 @@ bool test_interupts(Vcore* dut, VerilatedVcdC* vcd) {
         sim_mem(dut, instr);
         sim_data_mem(dut);
 
-        if(rand() % 100 < 5 && !dut->i_irq) {
-            std::cout<<"irq";
+        if(rand() % 100 < 5 && !dut->i_irq && dut->dbg_pc != 0x14) {
+            std::cout<<"irq\n";
             irqc++;
             dut->i_irq = 1;
         }
 
         tick(dut, vcd);
-
-        std::cout<<"r0:"<<dut->dbg_r0<<" pc:"<<dut->dbg_pc<<'\n';
         
-        if(dut->dbg_pc == 18) {
-            std::cout<<"cli";
+        if(dut->dbg_pc == 0x14) {
+            std::cout<<"cli\n";
             dut->i_irq = 0; // cli
         }
 
@@ -303,8 +304,8 @@ bool test_interupts(Vcore* dut, VerilatedVcdC* vcd) {
 
     int r0 = dut->dbg_r0;
     int r1 = dut->rootp->core__DOT__execute__DOT__rf__DOT____Vcellout__rf_regs__BRA__1__KET____DOT__rf_reg__o_d;
-    std::cout<<"r0: "<<r0<<" r1: "<<r1<<'\n';
-    if(r0 != 0x10 /*|| r1 != irqc*/) {
+    std::cout<<"r0: "<<r0<<" r1: "<<r1<<"  ex:"<<irqc<<'\n';
+    if(r0 != 0x10 || r1 != irqc) {
         std::cout<<"test_interrupt failed\n";
         return false;
     }
