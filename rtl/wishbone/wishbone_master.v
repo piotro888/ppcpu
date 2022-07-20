@@ -36,7 +36,7 @@ always @(posedge i_clk) begin
         wb_cyc <= 1'b0;
         wb_stb <= 1'b0;
         o_mem_ack <= 1'b0;
-    end else if (i_mem_req & ~wb_cyc) begin
+    end else if (i_mem_req & ~wb_cyc & ~o_mem_ack) begin // decide bus rules (is ~o_mem_ack needed -> speed; next was intended to use here or below?)
         wb_cyc <= 1'b1;
         wb_stb <= 1'b1;
         wb_adr <= i_mem_addr;
