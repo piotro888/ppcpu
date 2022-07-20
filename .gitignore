@@ -1,6 +1,9 @@
 
 obj_dir/
 *.vcd
+*.gtkw
+/*.hex
 
 .vscode/
 *.code-workspace
+notes
