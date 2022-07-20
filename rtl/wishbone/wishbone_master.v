@@ -9,7 +9,8 @@ module wishbone_master (
     input i_rst,
 
     // Cpu interface
-    input [`RW-1:0] i_mem_addr, i_mem_data,
+    input [`WB_ADDR_W-1:0] i_mem_addr, 
+    input [`RW-1:0] i_mem_data,
     output reg [`RW-1:0] o_mem_data,
     input i_mem_req, i_mem_we,
     output reg o_mem_ack,
@@ -38,12 +39,12 @@ always @(posedge i_clk) begin
     end else if (i_mem_req & ~wb_cyc) begin
         wb_cyc <= 1'b1;
         wb_stb <= 1'b1;
-        wb_adr <= {8'b0, i_mem_addr};
+        wb_adr <= i_mem_addr;
         wb_o_dat <= (i_mem_we ? i_mem_data : `WB_DATA_W'b0);
         wb_we <= i_mem_we;
         o_mem_ack <= 1'b0;
-    end else if (wb_cyc & wb_stb & wb_ack & i_mem_next) begin
-        wb_adr <= {8'b0, i_mem_addr};
+    end else if (wb_cyc & wb_stb & wb_ack & i_mem_next & i_mem_req) begin
+        wb_adr <= i_mem_addr;
         o_mem_ack <= 1'b1;
         o_mem_data <= (wb_we ? `RW'b0 : wb_i_dat);
     end else if (wb_cyc & wb_stb & wb_ack) begin 
