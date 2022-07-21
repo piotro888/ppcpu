@@ -8,12 +8,30 @@ typedef Vmb_downconverter Vdut;
 
 uint64_t sim_time = 0;
 
-void tick(Vdut *dut, VerilatedVcdC* vcd) {
-    do {
-        dut->i_clk ^= 1;
-        dut->eval();
-        vcd->dump(sim_time++);
-    } while(dut->i_clk);
+int req_time = 0;
+int req_addr = 0;
+std::map <int, int> exp_data;
+
+void settle(Vdut *d) {
+    d->i_clk = 0;
+    d->eval(); 
+}
+
+void tick(Vdut *d, VerilatedVcdC* vcd) {
+    sim_time++;
+
+    settle(d);
+    vcd->dump(sim_time*10-1);
+
+    d->i_clk = 1;
+    d->eval();
+    vcd->dump(sim_time*10);
+
+    d->i_clk = 0;
+    d->eval();
+    vcd->dump(sim_time*10+5);
+
+    vcd->flush();
 
     std::cout<<".";
 }
@@ -25,12 +43,9 @@ void cpu_reset(Vdut* dut, VerilatedVcdC* v_vcd) {
     dut->i_rst = 0;
 }
 
-int req_time = 0;
-int req_addr = 0;
-std::map <int, int> exp_data;
 void sim_new_mem(Vdut* d) {
     d->d_req_data_valid = 0;
-    if(d->d_req_active && !d->d_req_data_valid) {
+    if(d->d_req_active && (!d->d_req_data_valid || d->d_req_next)) {
         if (!req_time) {
             req_addr = d->d_req_addr;
             std::cout<<std::hex<<"new"<<' '<<req_addr<<'\n';
@@ -69,12 +84,16 @@ int main() {
     cpu_reset(d, vcd);
 
     bool fail = false;
-    for(int i=0; i<400; i++) {
-        
-        tick(d, vcd);
+    for(int i=0; i<100; i++) {
+        if(!d->u_req_active && !(rand() % 3)) {
+            d->u_req_active = 1;
+            d->u_req_addr = rand()%30000;
+        }
 
+        settle(d);
         sim_new_mem(d);
 
+        settle(d);
         if(d->u_req_data_valid) {
             d->u_req_active = 0;
             int req_addr = (d->u_req_addr<<1);
@@ -87,11 +106,7 @@ int main() {
             }
         }
 
-        if(!d->u_req_active && !(rand() % 3)) {
-            d->u_req_active = 1;
-            d->u_req_addr = rand()%30000;
-        }
-
+        tick(d, vcd);
     }
 
     d->final();
