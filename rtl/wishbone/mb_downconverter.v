@@ -20,11 +20,12 @@ module mb_downconverter (
 wire [`RW-1:0] first_addr = {u_req_addr[`RW-2:0], 1'b0};
 wire [`RW-1:0] second_addr = {u_req_addr[`RW-2:0], 1'b1};
 
-assign d_req_active = u_req_active & ~u_req_data_valid & ~(lower_valid & d_req_data_valid);
+assign d_req_active = u_req_active;
 assign d_req_next = d_req_active & ~prev_done & ~lower_valid;
 assign d_req_addr = (d_req_next | lower_valid) ? second_addr : first_addr;
 
 assign u_req_data = {d_req_data, lower_part};
+assign u_req_data_valid = lower_valid & d_req_data_valid;
 
 reg prev_done, req_reg;
 reg lower_valid;
@@ -37,15 +38,10 @@ always @(posedge i_clk) begin
     end else if (d_req_data_valid & ~lower_valid) begin      
         lower_valid <= 1'b1;
         lower_part <= d_req_data;
-        u_req_data_valid <= 1'b0;
     end else if (d_req_data_valid & lower_valid) begin
         lower_valid <= 1'b0;
-        u_req_data_valid <= 1'b1;
-    end else begin
-        u_req_data_valid <= 1'b0;
     end
-    req_reg <= ~u_req_active;
-    prev_done <= req_reg | u_req_data_valid;
+    prev_done <= ~u_req_active | u_req_data_valid;
 end
 
 endmodule
