@@ -57,11 +57,11 @@ wire [`WB_SEL_BITS-1:0] data_wb_sel;
 mb_downconverter fetch_mdc(.i_clk(i_clk), .i_rst(i_rst), .u_req_active(fetch_req_active), .u_req_data_valid(fetch_req_ack), .u_req_addr(fetch_req_addr), .u_req_data(fetch_req_data),
     .d_req_active(fetch_d_req_active), .d_req_data_valid(fetch_d_req_ack), .d_req_addr(fetch_d_req_addr), .d_req_data(fetch_d_req_data), .d_req_next(fetch_d_req_next));
 
-wishbone_master fetch_wbm(.i_clk(i_clk), .i_rst(i_rst), .wb_cyc(fetch_wb_cyc), .wb_stb(fetch_wb_stb),
+wishbone_adapter fetch_wbm(.i_clk(i_clk), .i_rst(i_rst), .wb_cyc(fetch_wb_cyc), .wb_stb(fetch_wb_stb),
     .wb_we(fetch_wb_we), .wb_ack(fetch_wb_ack), .wb_err(fetch_wb_err), .wb_rty(fetch_wb_rty), .wb_i_dat(wb_i_dat),
     .wb_o_dat(fetch_wb_o_dat), .wb_adr(fetch_wb_adr), .wb_sel(fetch_wb_sel), .i_mem_addr({8'b1, fetch_d_req_addr}), .i_mem_data(`RW'b0), 
     .o_mem_data(fetch_d_req_data), .i_mem_req(fetch_d_req_active), .i_mem_we(1'b0), .o_mem_ack(fetch_d_req_ack), .i_mem_next(fetch_d_req_next));
-wishbone_master data_wbm(.i_clk(i_clk), .i_rst(i_rst), .wb_cyc(data_wb_cyc), .wb_stb(data_wb_stb),
+wishbone_adapter data_wbm(.i_clk(i_clk), .i_rst(i_rst), .wb_cyc(data_wb_cyc), .wb_stb(data_wb_stb),
     .wb_we(data_wb_we), .wb_ack(data_wb_ack), .wb_err(data_wb_err), .wb_rty(data_wb_rty), .wb_i_dat(wb_i_dat),
     .wb_o_dat(data_wb_o_dat), .wb_adr(data_wb_adr), .wb_sel(data_wb_sel), .i_mem_addr({8'b0, data_mem_addr}), .i_mem_data(data_o_mem_data), 
     .o_mem_data(data_i_mem_data), .i_mem_req(data_mem_req), .i_mem_we(data_mem_we), .o_mem_ack(data_mem_ack), .i_mem_next(1'b0));
@@ -101,5 +101,6 @@ endmodule
 
 `include "core.v"
 `include "wishbone/mb_downconverter.v"
-`include "wishbone/wishbone_master.v"
+`include "wishbone/wishbone_adapter.v"
 `include "wishbone/wishbone_arbiter.v"
+//`include "wishbone/wishbone_master.v"
