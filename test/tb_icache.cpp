@@ -143,7 +143,7 @@ int main() {
     d->imem_next = 1;
     d->imem_addr = 5;
     } while(!d->imem_ack);
-    const int req[] = {5, 6, 7, 4, 5};
+    int req[] = {5, 6, 7, 4, 5};
     for(int i=0; i<5; i++) {
         d->imem_req = 1;
         d->imem_next = 1;
@@ -154,11 +154,45 @@ int main() {
         if(i!=0) // delay after cache update
             assert(d->imem_ack);
     }
+    d->imem_req = 1;
+    d->imem_next = 0;
+    d->imem_addr = 8;
+    tick(d, vcd);
+    sim_mem(d);
+    settle(d);
+    do {
+    tick(d, vcd);
+    sim_mem(d);
+    settle(d);
+    d->imem_next = 1;
+    d->imem_addr = 9;
+    } while(!d->imem_ack);
     for(int i=0; i<2; i++) {
         d->imem_req = 0;
         tick(d, vcd);
         sim_mem(d);
         settle(d);
+    }
+
+    int req2[] = {9, 6, 7, 8};
+    for(int i=0; i<4; i++) {
+        d->imem_req = 1;
+        d->imem_next = 1;
+        d->imem_addr = req2[i];
+        tick(d, vcd);
+        sim_mem(d);
+        settle(d);
+        if(i!=0) // delay after cache update
+            assert(d->imem_ack);
+    }
+
+    for(int i=0; i<2; i++) {
+        d->imem_req = 0;
+        tick(d, vcd);
+        sim_mem(d);
+        settle(d);
+        if(!i)
+            assert(d->imem_ack);
     }
 
     d->final();

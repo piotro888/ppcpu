@@ -71,6 +71,7 @@ always @(posedge i_clk) begin
         state <= `STATE_IDLE;
         imem_ack <= 1'b0;
         omem_req <= 1'b0;
+        cache_we <= `CACHE_ASSOC'b0;
     end else begin
     case (state)
         default: begin // idle
@@ -118,10 +119,12 @@ always @(posedge i_clk) begin
             end
         end
         `STATE_WR_WAIT: begin
+            cache_we <= `CACHE_ASSOC'b0;
             mentry_out <= cache_mem_in;
             out_cache_off <= l_req_addr[1:0];
             imem_ack <= 1'b1;
             state <= `STATE_IDLE;
+            // `next` not hanlded here, because a 1 cycle delay from cache write is needed
         end
     endcase
     end
