@@ -116,9 +116,11 @@ int main() {
             d->imem_addr = m_req_addr+1;
         }
 
+        d->imem_sync_next = 0;
         if(!d->imem_req && (rand()&1)) {
             first_cyc = true;
             d->imem_next = 0;
+            d->imem_sync_next = d->imem_ack;
             d->imem_addr = ++m_req_addr;
             d->imem_req = 1;
             reqstime = sim_time;
@@ -141,12 +143,14 @@ int main() {
     sim_mem(d);
     settle(d);
     d->imem_next = 1;
+    d->imem_sync_next = 1;
     d->imem_addr = 5;
     } while(!d->imem_ack);
     int req[] = {5, 6, 7, 4, 5};
     for(int i=0; i<5; i++) {
         d->imem_req = 1;
         d->imem_next = 1;
+        d->imem_sync_next = 1;
         d->imem_addr = req[i];
         tick(d, vcd);
         sim_mem(d);
@@ -156,6 +160,7 @@ int main() {
     }
     d->imem_req = 1;
     d->imem_next = 0;
+    d->imem_sync_next = 1;
     d->imem_addr = 8;
     tick(d, vcd);
     sim_mem(d);
@@ -165,6 +170,7 @@ int main() {
     sim_mem(d);
     settle(d);
     d->imem_next = 1;
+    d->imem_sync_next = 1;
     d->imem_addr = 9;
     } while(!d->imem_ack);
     for(int i=0; i<2; i++) {
@@ -178,6 +184,7 @@ int main() {
     for(int i=0; i<4; i++) {
         d->imem_req = 1;
         d->imem_next = 1;
+        d->imem_sync_next = 1;
         d->imem_addr = req2[i];
         tick(d, vcd);
         sim_mem(d);

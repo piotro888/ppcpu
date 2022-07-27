@@ -8,7 +8,8 @@ module icache (
     output reg imem_ack,
     input [`RW-1:0] imem_addr,
     output reg [`I_SIZE-1:0] imem_data,
-    input imem_next,
+    input imem_next, // this signal is like pre-next and allows submitting new request at ack edge (in comb domain)
+    input imem_sync_next, // this signal is std bus fetch, that allows submitting new request if ack is high
 
     output omem_req,
     output [`RW-1:0] omem_addr,
@@ -49,11 +50,12 @@ generate
     end
 endgenerate
 
-`define SW 2
+`define SW 3
 `define STATE_IDLE `SW'b0
 `define STATE_CACHE_READ `SW'b1
 `define STATE_MEM_READ `SW'b10
 `define STATE_WR_WAIT `SW'b11
+`define STATE_AW_NEXT `SW'b100
 reg [`SW-1:0] state;
 
 reg [`RW-1:0] l_req_addr;
@@ -64,7 +66,7 @@ reg [`CACHE_OFF_W-1:0] out_cache_off;
 wire cache_addr_source = |cache_we; 
 
 assign omem_burst4 = 1'b1;
-assign omem_addr = {l_req_addr[`RW-1:`CACHE_OFF_W], `CACHE_OFF_W'b0};
+assign omem_addr = {l_req_addr[`RW-1:`CACHE_OFF_W], burst_cnt};
 
 always @(posedge i_clk) begin
     if (i_rst) begin
@@ -77,7 +79,7 @@ always @(posedge i_clk) begin
         default: begin // idle
             imem_ack <= 1'b0;
             
-            if(imem_req) begin
+            if(imem_req & ~imem_ack | (imem_req & imem_ack & imem_sync_next)) begin
                 state <= `STATE_CACHE_READ;
                 l_req_addr <= imem_addr;
             end
@@ -124,7 +126,14 @@ always @(posedge i_clk) begin
             out_cache_off <= l_req_addr[1:0];
             imem_ack <= 1'b1;
             state <= `STATE_IDLE;
+            if(imem_req & imem_next)
+                state <= `STATE_AW_NEXT;
             // `next` not hanlded here, because a 1 cycle delay from cache write is needed
+        end
+        `STATE_AW_NEXT: begin
+            imem_ack <= 1'b0;
+            state <= `STATE_CACHE_READ;
+            l_req_addr <= imem_addr;
         end
     endcase
     end
