@@ -84,7 +84,7 @@ int main() {
 
     
     tick(d, vcd);
-    for(int i=0; i<1000; i++) {
+    for(int i=0; i<10000; i++) {
         bool first_cyc = false;
         if(d->imem_ack) {
             
@@ -111,10 +111,10 @@ int main() {
 
         settle(d);
 
-        // if(d->imem_req && !d->imem_next && (rand()&2) && !first_cyc) {
-        //     d->imem_next = 1;
-        //     d->imem_addr = m_req_addr+1;
-        // }
+        if(d->imem_req && !d->imem_next && (rand()&2) && !first_cyc) {
+            d->imem_next = 1;
+            d->imem_addr = m_req_addr+1;
+        }
 
         if(!d->imem_req && (rand()&1)) {
             first_cyc = true;
@@ -124,6 +124,38 @@ int main() {
             reqstime = sim_time;
         }
 
+        tick(d, vcd);
+        sim_mem(d);
+        settle(d);
+    }
+
+    d->imem_req = 0;
+    d->imem_next = 0;
+    cpu_reset(d, vcd);
+    tick(d, vcd);
+    d->imem_req = 1;
+    d->imem_next = 0;
+    d->imem_addr = 4;
+    do {
+    tick(d, vcd);
+    sim_mem(d);
+    settle(d);
+    d->imem_next = 1;
+    d->imem_addr = 5;
+    } while(!d->imem_ack);
+    const int req[] = {5, 6, 7, 4, 5};
+    for(int i=0; i<5; i++) {
+        d->imem_req = 1;
+        d->imem_next = 1;
+        d->imem_addr = req[i];
+        tick(d, vcd);
+        sim_mem(d);
+        settle(d);
+        if(i!=0) // delay after cache update
+            assert(d->imem_ack);
+    }
+    for(int i=0; i<2; i++) {
+        d->imem_req = 0;
         tick(d, vcd);
         sim_mem(d);
         settle(d);
