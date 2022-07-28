@@ -40,7 +40,8 @@ wire [`TAG_SIZE-1:0] compare_tag = cache_read_addr[15:7];
 wire [`TAG_SIZE-1:0] write_tag = cache_write_addr[15:7];
 wire [`CACHE_IDX_WIDTH-1:0] input_index = mem_addr[6:2];
 wire [`CACHE_IDX_WIDTH-1:0] wire_index = cache_write_addr[6:2];
-wire [`CACHE_OFF_W-1:0] compare_off = cache_read_addr[1:0]; 
+wire [`CACHE_OFF_W-1:0] compare_off = cache_read_addr[1:0];
+wire [`CACHE_OFF_W-1:0] write_off = cache_write_addr[1:0];
 
 wire [`ENTRY_SIZE-1:0] cache_mem_in = cache_write_entry;
 wire [`ENTRY_SIZE-1:0] cache_out [`CACHE_ASSOC-1:0];
@@ -68,7 +69,7 @@ wire cache_miss = cache_read_valid & ~(|cache_hit);
 wire cache_ghit = cache_read_valid & (|cache_hit);
 
 always @(posedge i_clk)
-    cache_read_addr <= mem_addr;
+    cache_read_addr <= (submit_pending ? submit_pending_addr : mem_addr);
 
 always @(posedge i_clk) begin
     if(cache_read_valid)
@@ -79,16 +80,18 @@ always @(posedge i_clk)
     prev_write_compl <= |cache_we;
 
 reg submit_pending;
+reg [`RW-1:0] submit_pending_addr;
 always @(posedge i_clk) begin
     if(i_rst)
         submit_pending <= 1'b0;
-    else if (mem_ppl_submit & ~accept_ok)
+    else if (mem_ppl_submit & ~accept_ok) begin
         submit_pending <= 1'b1;
-    else if (accept_ok)
+        submit_pending_addr <= mem_addr;
+    end else if (accept_ok)
         submit_pending <= 1'b0;
 end
 
-wire accept_ok = mem_req & ~prev_write_compl & ~cache_write_valid & ~cache_miss;
+wire accept_ok = mem_req &/* ~prev_write_compl */& ~cache_write_valid & ~cache_miss;
 
 always @(posedge i_clk) begin
     if(i_rst)
@@ -150,8 +153,9 @@ always @* begin
     endcase
 end
 
+wire [`CACHE_OFF_W-1:0] offset_out = (mem_fetch_end ? write_off : compare_off);
 always @* begin
-    case (compare_off)
+    case (offset_out)
         default: mem_data = entry_out[32:1];
         2'b01: mem_data = entry_out[64:33];
         2'b10: mem_data = entry_out[96:65];
