@@ -225,7 +225,7 @@ end
 reg input_valid;
 
 // ready signal must be combinational to be registered on time by previous stage
-assign o_ready = i_next_ready;
+assign o_ready = i_next_ready & ~input_valid;
 
 always @(posedge i_clk) begin
     if(i_rst) begin

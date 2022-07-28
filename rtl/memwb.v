@@ -34,7 +34,7 @@ assign o_mem_we = i_mem_we;
 wire reg_ie = ((i_mem_access & i_mem_ack) | (~i_mem_access & i_submit)) & (|i_reg_ie);
 assign o_reg_ie = (reg_ie ? i_reg_ie : `REGNO'b0);
 
-assign o_ready = ~o_mem_req | (o_mem_req & i_mem_ack);
+assign o_ready = (~o_mem_req | (o_mem_req & i_mem_ack)) & ~(i_submit & i_mem_access);
 
 always @(posedge i_clk) begin
     if (i_rst) begin
