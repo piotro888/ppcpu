@@ -6,7 +6,7 @@ module core (
 
     // fetch input singals
     output [`RW-1:0] o_req_addr,
-    output o_req_active,
+    output o_req_active, o_req_ppl_submit,
     input [`I_SIZE-1:0] i_req_data,
     input i_req_data_valid,
 
@@ -35,7 +35,7 @@ wire fde_pipeline_flush;
 fetch fetch (.i_clk(i_clk), .i_rst(i_rst), .o_req_active(o_req_active), .o_req_addr(o_req_addr),
     .i_req_data(i_req_data), .i_req_data_valid(i_req_data_valid), .i_next_ready(fetch_decode_next_ready),
     .o_submit(fetch_decode_submit), .o_instr(fetch_decode_d_instr), .o_jmp_predict(fetch_decode_jmp_pred),
-    .i_exec_pc(execute_fetch_pc), .i_flush(fde_pipeline_flush));
+    .i_exec_pc(execute_fetch_pc), .i_flush(fde_pipeline_flush), .o_req_ppl_submit(o_req_ppl_submit));
 
 wire decode_execute_next_ready;
 wire decode_execute_submit;

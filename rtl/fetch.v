@@ -10,6 +10,7 @@ module fetch (
     output reg o_req_active,
     input [`I_SIZE-1:0] i_req_data,
     input i_req_data_valid,
+    output reg o_req_ppl_submit,
     
     input i_next_ready,
     output reg o_submit,
@@ -41,6 +42,7 @@ always @(posedge i_clk) begin
         o_submit <= 1'b0; // wait until first requst is completed
         o_instr <= `I_SIZE'b0;
         o_req_active <= 1'b0;
+        o_req_ppl_submit <= 1'b0;
         hold_valid <= 1'b0;
         invalidate_request <= 1'b0;
     end else if (i_flush) begin
@@ -50,10 +52,13 @@ always @(posedge i_clk) begin
         // read new correct pc (-1 to fetch correct one) and start request
         fetch_pc <= i_exec_pc - `RW'b1;
         o_instr <= `I_SIZE'b0; // ensure +1 pred
-        invalidate_request <= o_req_active;
+        invalidate_request <= o_req_active & ~i_req_data_valid;
+        o_req_ppl_submit <= ~(o_req_active & ~i_req_data_valid);
+        o_req_active <= 1'b1;
     end else if (i_req_data_valid & invalidate_request) begin
         invalidate_request <= 1'b0;
         o_req_active <= 1'b1;
+        o_req_ppl_submit <= 1'b1;
         o_submit <= 1'b0;
     end else if (i_req_data_valid & i_next_ready) begin
         // memory request completed, submit instruction
@@ -62,11 +67,13 @@ always @(posedge i_clk) begin
         o_submit <= 1'b1;
         // always request new instruction, address is computed comb
         o_req_active <= 1'b1;
+        o_req_ppl_submit <= 1'b1;
     end else if(i_req_data_valid & ~i_next_ready) begin
         hold_instr <= i_req_data;
         hold_valid <= 1'b1;
         o_req_active <= 1'b0;
         o_submit <= 1'b0;
+        o_req_ppl_submit <= 1'b0;
     end else if(hold_valid & i_next_ready) begin
         // submit holded instruction when next stage is ready
         o_instr <= hold_instr;
@@ -74,10 +81,13 @@ always @(posedge i_clk) begin
         o_submit <= 1'b1;
         hold_valid <= 1'b0;
         o_req_active <= 1'b1;
+        o_req_ppl_submit <= 1'b1;
     end else if (~hold_valid) begin // don't overwrite hold
         o_req_active <= 1'b1;
         o_submit <= 1'b0;
+        o_req_ppl_submit <= ~o_req_active;
     end else begin
+        o_req_ppl_submit <= 1'b0;
         o_req_active <= 1'b0;
         o_submit <= 1'b0;
     end
