@@ -1,16 +1,15 @@
 `include "config.v"
 
-// Instruction fetch stage
+// Instruction fetch stage v2
 
 module fetch (
     input i_clk,
     input i_rst,
 
-    output [`RW-1:0] o_req_addr,
-    output reg o_req_active,
-    input [`I_SIZE-1:0] i_req_data,
-    input i_req_data_valid,
-    output reg o_req_ppl_submit,
+    output [`RW-1:0] mem_addr, // address must be valid only if submit is set (registered on other end)
+    input [`I_SIZE-1:0] mem_data,
+    input mem_ack,
+    output reg mem_submit, // pipelined submit signal
     
     input i_next_ready,
     output reg o_submit,
@@ -22,102 +21,118 @@ module fetch (
     input [`RW-1:0] i_exec_pc
 );
 
-reg [`I_SIZE-1:0] hold_instr; // buffer if output is not ready
-reg hold_valid;
+assign mem_addr = (pc_reset_override ? `RW'b0 : ((i_flush | pc_flush_override) ? i_exec_pc : pred_pc));
+assign mem_submit = (((mem_ack & ~out_buffer_valid & i_next_ready) | pc_reset_override | (out_buffer_valid & out_buff_read))) & ~i_rst;
 
-reg [`RW-1:0] fetch_pc, next_fetch_pc;
-reg next_branch_pred;
-assign o_jmp_predict = next_branch_pred;
-reg invalidate_request;
-wire [`RW-1:0] instr_imm = o_instr[31:16];
-
-// halt loop opt: disable req and submit current instruction
-// NOTE: don't do prediction on srs 0 and iret
-
-assign o_req_addr = next_fetch_pc;
-
+reg pc_reset_override;
 always @(posedge i_clk) begin
-    if(i_rst) begin
-        fetch_pc <= -`RW'b1; // start from addr 0
-        o_submit <= 1'b0; // wait until first requst is completed
-        o_instr <= `I_SIZE'b0;
-        o_req_active <= 1'b0;
-        o_req_ppl_submit <= 1'b0;
-        hold_valid <= 1'b0;
-        invalidate_request <= 1'b0;
-    end else if (i_flush) begin
-        // invalidate everything on flush
-        o_submit <= 1'b0;
-        hold_valid <= 1'b0;
-        // read new correct pc (-1 to fetch correct one) and start request
-        fetch_pc <= i_exec_pc - `RW'b1;
-        o_instr <= `I_SIZE'b0; // ensure +1 pred
-        invalidate_request <= o_req_active & ~i_req_data_valid;
-        o_req_ppl_submit <= ~(o_req_active & ~i_req_data_valid);
-        o_req_active <= 1'b1;
-    end else if (i_req_data_valid & invalidate_request) begin
-        invalidate_request <= 1'b0;
-        o_req_active <= 1'b1;
-        o_req_ppl_submit <= 1'b1;
-        o_submit <= 1'b0;
-    end else if (i_req_data_valid & i_next_ready) begin
-        // memory request completed, submit instruction
-        o_instr <= i_req_data;
-        fetch_pc <= next_fetch_pc;
-        o_submit <= 1'b1;
-        // always request new instruction, address is computed comb
-        o_req_active <= 1'b1;
-        o_req_ppl_submit <= 1'b1;
-    end else if(i_req_data_valid & ~i_next_ready) begin
-        hold_instr <= i_req_data;
-        hold_valid <= 1'b1;
-        o_req_active <= 1'b0;
-        o_submit <= 1'b0;
-        o_req_ppl_submit <= 1'b0;
-    end else if(hold_valid & i_next_ready) begin
-        // submit holded instruction when next stage is ready
-        o_instr <= hold_instr;
-        fetch_pc <= next_fetch_pc;
-        o_submit <= 1'b1;
-        hold_valid <= 1'b0;
-        o_req_active <= 1'b1;
-        o_req_ppl_submit <= 1'b1;
-    end else if (~hold_valid) begin // don't overwrite hold
-        o_req_active <= 1'b1;
-        o_submit <= 1'b0;
-        o_req_ppl_submit <= ~o_req_active;
-    end else begin
-        o_req_ppl_submit <= 1'b0;
-        o_req_active <= 1'b0;
-        o_submit <= 1'b0;
+    if (i_rst) begin
+        pc_reset_override <= 1'b1;
+    end else if (mem_submit) begin
+        pc_reset_override <= 1'b0;
     end
 end
 
+reg pc_flush_override;
+always @(posedge i_clk) begin
+    if (i_rst | mem_submit)
+        pc_flush_override <= 1'b0;
+    else if (i_flush)
+        pc_flush_override <= 1'b1;
+end
+
+reg flush_event_invalidate;
+always @(posedge i_clk) begin
+    if (i_rst | mem_ack)
+        flush_event_invalidate <= 1'b0;
+    else if (i_flush & instr_wait & ~mem_ack)
+        flush_event_invalidate <= 1'b1;
+end
+
+reg instr_wait;
+always @(posedge i_clk) begin
+    if (i_rst)
+        instr_wait <= 1'b0;
+    else if (mem_submit)
+        instr_wait <= 1'b1;
+    else if (mem_ack)
+        instr_wait <= 1'b0;
+end
+
+wire out_ready = out_buffer_valid | mem_ack;
+wire [`I_SIZE-1:0] out_instr = (out_buffer_valid ? out_buffer_data_instr : mem_data);
+wire out_jmp_predict = (out_buffer_valid ? out_buffer_data_pred : current_req_branch_pred);
+wire submitable = out_ready & i_next_ready & ~(i_flush | flush_event_invalidate);
+always @(posedge i_clk) begin
+    o_submit <= submitable;
+    if (submitable) begin
+        o_instr <= out_instr;
+        o_jmp_predict <= out_jmp_predict;
+    end
+end
+
+reg [`RW-1:0] prev_request_pc;
+always @(posedge i_clk) begin
+    if(mem_submit)
+        prev_request_pc <= mem_addr;
+end
+
+wire current_req_branch_pred = (mem_submit ? branch_pred_res : prev_req_branch_pred);
+reg prev_req_branch_pred;
+always @(posedge i_clk) begin
+    if(mem_submit)
+        prev_req_branch_pred <= branch_pred_res;
+end
+
+wire [`RW-1:0] pred_pc = (branch_pred_res ? branch_pred_imm : prev_request_pc + `RW'b1);
+
+wire [`I_SIZE-1:0] branch_pred_instr = mem_data;
+wire [`RW-1:0] branch_pred_imm =  branch_pred_instr[`I_SIZE-1:`I_SIZE-`RW];
+
+reg branch_pred_res;
+
 // BRANCH PREDICTION / PC DECODE
 always @(*) begin
-    if (o_instr[6:0] == 7'h0e) begin
-        if (o_instr[10:7] == 4'h0) begin
+    if (pc_reset_override) begin
+        branch_pred_res = 1'b0;
+    end else if (branch_pred_instr[6:0] == 7'h0e) begin
+        if (branch_pred_instr[10:7] == 4'h0) begin
             // unconditional jump
-            next_fetch_pc = instr_imm;
-            next_branch_pred = 1'b1;
+            branch_pred_res = 1'b1;
         end else begin
             // try to predict jump
-            if (fetch_pc > instr_imm) begin
+            if (prev_request_pc > branch_pred_imm) begin
                 // back jump (taken)
-                next_fetch_pc = instr_imm;
-                next_branch_pred = 1'b1;
+                branch_pred_res = 1'b1;
             end else begin
                 // forward jump (not taken)
-                next_fetch_pc = fetch_pc + `RW'b1;
-                next_branch_pred = 1'b0;
+                branch_pred_res = 1'b0;
             end
         end
-    end else if (o_instr[6:0] == 7'h0f) begin
-        next_fetch_pc = instr_imm;
-        next_branch_pred = 1'b1;
+    end else if (branch_pred_instr[6:0] == 7'h0f) begin
+        branch_pred_res = 1'b1;
     end else begin
-        next_fetch_pc = fetch_pc + `RW'b1;
-        next_branch_pred = 1'b0;
+        branch_pred_res = 1'b0;
+    end
+end
+
+reg [`I_SIZE-1:0] out_buffer_data_instr;
+reg out_buffer_data_pred;
+reg out_buffer_valid;
+
+wire out_buff_write = mem_ack & ~i_next_ready & ~(i_flush | flush_event_invalidate);
+wire out_buff_read = out_buffer_valid & i_next_ready;
+always @(posedge i_clk) begin
+    if (i_rst) begin
+        out_buffer_valid <= 1'b0;
+    end else if (i_flush) begin
+        out_buffer_valid <= 1'b0;
+    end else if (out_buff_write) begin
+        out_buffer_data_instr <= mem_data;
+        out_buffer_data_pred <= current_req_branch_pred;
+        out_buffer_valid <= 1'b1;
+    end else if (out_buffer_valid & i_next_ready) begin
+        out_buffer_valid <= 1'b0;
     end
 end
 

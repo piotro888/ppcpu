@@ -32,10 +32,11 @@ wire [`RW-1:0] execute_fetch_pc;
 wire fde_pipeline_flush;
 
 // Pipeline stage 0 - FETCH
-fetch fetch (.i_clk(i_clk), .i_rst(i_rst), .o_req_active(o_req_active), .o_req_addr(o_req_addr),
-    .i_req_data(i_req_data), .i_req_data_valid(i_req_data_valid), .i_next_ready(fetch_decode_next_ready),
+fetch fetch (.i_clk(i_clk), .i_rst(i_rst), .mem_addr(o_req_addr), .mem_submit(o_req_ppl_submit),
+    .mem_data(i_req_data), .mem_ack(i_req_data_valid), .i_next_ready(fetch_decode_next_ready),
     .o_submit(fetch_decode_submit), .o_instr(fetch_decode_d_instr), .o_jmp_predict(fetch_decode_jmp_pred),
-    .i_exec_pc(execute_fetch_pc), .i_flush(fde_pipeline_flush), .o_req_ppl_submit(o_req_ppl_submit));
+    .i_exec_pc(execute_fetch_pc), .i_flush(fde_pipeline_flush));
+assign o_req_active = 1'b1;
 
 wire decode_execute_next_ready;
 wire decode_execute_submit;
