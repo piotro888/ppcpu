@@ -42,7 +42,10 @@ module execute (
     input [`REGNO-1:0] i_reg_ie,
     input [`RW-1:0] i_reg_data,
 
-    input i_irq
+    input i_irq,
+    output o_c_instr_page,
+    output [`RW-1:0] sr_bus_addr, sr_bus_data_o,
+    output sr_bus_we
 );
 
 reg next_ready_delayed;
@@ -226,7 +229,8 @@ end
 // Special registers control
 
 wire irq_en = sreg_priv_control_out[2], sreg_priv_mode = sreg_priv_control_out[0];
-register #(.RESET_VAL(`RW'b1)) sreg_priv_control (.i_clk(i_clk), .i_rst(i_rst), .i_d(priv_in), .o_d(sreg_priv_control_out),
+assign o_c_instr_page = sreg_priv_control_out[3];
+register #(.RESET_VAL(`RW'b1001)) sreg_priv_control (.i_clk(i_clk), .i_rst(i_rst), .i_d(priv_in), .o_d(sreg_priv_control_out),
     .i_ie((((sreg_priv_control_ie & sreg_priv_mode) | c_sreg_irt) & exec_submit) | irq));
 
 register sreg_irq_pc (.i_clk(i_clk), .i_rst(i_rst), .i_d(pc_val), .o_d(sreg_irq_pc_out), .i_ie(irq | sreg_irq_pc_ie));
@@ -240,6 +244,10 @@ always @* begin
     else
         priv_in = sreg_in;
 end
+
+assign sr_bus_addr = i_imm;
+assign sr_bus_we = c_sreg_store & exec_submit;
+assign sr_bus_data_o = sreg_in;
 
 endmodule
 

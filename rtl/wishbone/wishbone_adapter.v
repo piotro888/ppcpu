@@ -1,4 +1,4 @@
-`include "../config.v"
+`include "config.v"
 
 `define WB_DATA_W 16 
 `define WB_ADDR_W 24

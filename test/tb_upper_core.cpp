@@ -60,8 +60,8 @@ void sim_wishbone_mem(Vdut* d) {
 
 void load_mem(std::vector<int>& instr) {
     for(int i=0; i<instr.size(); i++) {
-        mem[0x10000 + 2*i] = instr[i] & 0xffff;
-        mem[0x10000 + 2*i + 1] = instr[i] >> 16;
+        mem[0x800000 + 2*i] = instr[i] & 0xffff;
+        mem[0x800000 + 2*i + 1] = instr[i] >> 16;
     }
 }
 
@@ -72,7 +72,7 @@ bool test_interupts(Vdut* dut, VerilatedVcdC* vcd) {
         0x0002000E,
         0x0011000E,
         0x00000084,
-        0x00050004,
+        0x000c0004,
         0x00010011,
         0x00000004,
         0x00100104,
@@ -91,6 +91,9 @@ bool test_interupts(Vdut* dut, VerilatedVcdC* vcd) {
         0x00040C11,
         0x00000000,
         0x0000001E,
+        0x00000000,
+        0x00050004,
+        0x01000011,
         0x0016000E};
     cpu_reset(dut, vcd);
     load_mem(instr);

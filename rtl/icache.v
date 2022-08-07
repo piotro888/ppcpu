@@ -15,7 +15,7 @@ module icache (
     output reg wb_cyc,
     output reg wb_stb,
     input [`RW-1:0] wb_i_dat,
-    output [24-1:0]  wb_adr,
+    output [`RW-1:0]  wb_adr,
     output reg wb_we,
     input wb_ack,
     output [1:0] wb_sel
@@ -102,7 +102,7 @@ end
 
 wire mem_fetch_end = wb_cyc & wb_stb & wb_ack & (&line_burst_cnt);
 
-assign wb_adr = {8'b1, cache_write_addr[14:2], line_burst_cnt};
+assign wb_adr = {cache_write_addr[14:2], line_burst_cnt};
 
 reg [`LINE_SIZE-1:0] line_collect;
 reg [`CACHE_OFF_W:0] line_burst_cnt;
