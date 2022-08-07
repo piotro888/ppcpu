@@ -5,7 +5,7 @@ module icache (
     input i_rst,
 
     input mem_req,
-    output reg mem_ack,
+    output mem_ack,
     input [`RW-1:0] mem_addr,
     output reg [`I_SIZE-1:0] mem_data,
     input mem_ppl_submit,
@@ -18,7 +18,7 @@ module icache (
     output [24-1:0]  wb_adr,
     output reg wb_we,
     input wb_ack,
-    output reg [1:0] wb_sel
+    output [1:0] wb_sel
 );
 
 assign wb_sel = 2'b11;
@@ -45,7 +45,7 @@ wire [`CACHE_OFF_W-1:0] write_off = cache_write_addr[1:0];
 
 wire [`ENTRY_SIZE-1:0] cache_mem_in = cache_write_entry;
 wire [`ENTRY_SIZE-1:0] cache_out [`CACHE_ASSOC-1:0];
-reg [`CACHE_ASSOC-1:0] cache_we;
+wire [`CACHE_ASSOC-1:0] cache_we;
 wire [`CACHE_ASSOC-1:0] cache_hit;
 
 reg [`RW-1:0] cache_read_addr, cache_write_addr;
@@ -57,7 +57,7 @@ genvar i;
 generate
     for (i=0; i<`CACHE_ASSOC; i=i+1) begin : cache_mem
         cache_mem #(.AW(`CACHE_IDX_WIDTH), .AS(`CACHE_IDXES), .DW(`ENTRY_SIZE)) mem (
-            .i_clk(i_clk), .i_addr((|cache_we) ? wire_index : input_index), .i_data(cache_mem_in),
+            .i_clk(i_clk), .i_rst(i_rst), .i_addr((|cache_we) ? wire_index : input_index), .i_data(cache_mem_in),
             .o_data(cache_out[i]), .i_we(cache_we[i]));
         assign cache_hit[i] = (cache_out[i][`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE] == compare_tag) && cache_out[i][0]; 
     end
@@ -91,7 +91,7 @@ always @(posedge i_clk) begin
         submit_pending <= 1'b0;
 end
 
-wire accept_ok = mem_req &/* ~prev_write_compl */& ~cache_write_valid & ~cache_miss;
+wire accept_ok = mem_req & ~cache_write_valid & ~cache_miss;
 
 always @(posedge i_clk) begin
     if(i_rst)
@@ -167,6 +167,8 @@ endmodule
 
 module cache_mem #(parameter AW = 2, parameter AS = 4, parameter DW = 16)(
     input i_clk,
+    input i_rst,
+
     input [AW-1:0] i_addr,
     input [DW-1:0] i_data,
     output reg [DW-1:0] o_data,
@@ -176,9 +178,15 @@ module cache_mem #(parameter AW = 2, parameter AS = 4, parameter DW = 16)(
 reg [DW-1:0] mem [AS-1:0];
 
 always @(posedge i_clk) begin
-    if(i_we)
-        mem[i_addr] <= i_data;
-    o_data <= mem[i_addr];
+    if (i_rst) begin
+        for (integer row = 0; row < AS; row = row+1) begin
+            mem[row][0] = 1'b0;
+        end
+    end else begin
+        if(i_we)
+            mem[i_addr] <= i_data;
+        o_data <= mem[i_addr];
+    end
 end
 
 endmodule

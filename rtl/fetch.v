@@ -9,14 +9,14 @@ module fetch (
     output [`RW-1:0] mem_addr, // address must be valid only if submit is set (registered on other end)
     input [`I_SIZE-1:0] mem_data,
     input mem_ack,
-    output reg mem_submit, // pipelined submit signal
+    output mem_submit, // pipelined submit signal
     
     input i_next_ready,
     output reg o_submit,
     input i_flush,
  
     output reg [`I_SIZE-1:0] o_instr,
-    output o_jmp_predict,
+    output reg o_jmp_predict,
 
     input [`RW-1:0] i_exec_pc
 );

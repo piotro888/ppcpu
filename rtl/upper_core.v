@@ -10,7 +10,7 @@ module upper_core (
     input wire i_clk,
     input wire i_rst,
 
-    output reg wb_cyc,
+    output wb_cyc,
     output reg wb_stb,
     output reg [`WB_DATA_W-1:0] wb_o_dat,
     input [`WB_DATA_W-1:0] wb_i_dat,
@@ -97,4 +97,3 @@ endmodule
 `include "wishbone/wishbone_adapter.v"
 `include "wishbone/wishbone_arbiter.v"
 `include "icache.v"
-//`include "wishbone/wishbone_master.v"

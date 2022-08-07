@@ -1,4 +1,4 @@
-`include "config.v"
+`include "../config.v"
 
 `define WB_DATA_W 16 
 `define WB_ADDR_W 24
@@ -13,20 +13,20 @@ module wishbone_adapter (
     input [`WB_DATA_W-1:0] i_mem_data,
     output [`WB_DATA_W-1:0] o_mem_data,
     input i_mem_req, i_mem_we,
-    output reg o_mem_ack,
+    output o_mem_ack,
     input i_mem_next,
 
     // Wishbone interface
-    output reg wb_cyc,
-    output reg wb_stb,
-    output reg [`WB_DATA_W-1:0] wb_o_dat,
+    output wb_cyc,
+    output wb_stb,
+    output [`WB_DATA_W-1:0] wb_o_dat,
     input [`WB_DATA_W-1:0] wb_i_dat,
-    output reg [`WB_ADDR_W-1:0]  wb_adr,
-    output reg wb_we,
+    output [`WB_ADDR_W-1:0]  wb_adr,
+    output wb_we,
     input wb_ack,
     input wb_err,
     input wb_rty,
-    output reg [`WB_SEL_BITS-1:0] wb_sel
+    output [`WB_SEL_BITS-1:0] wb_sel
 );
 
 assign wb_sel = 2'b11;
