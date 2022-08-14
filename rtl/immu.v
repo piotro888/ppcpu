@@ -34,8 +34,10 @@ wire [`RW-1:0] sr_addr_idx = i_sr_addr-`SR_ADDR_OFF;
 wire addr_in_range = (i_sr_addr >= `SR_ADDR_OFF) && (i_sr_addr < `SR_ADDR_OFF+16);
 always @(posedge i_clk) begin
     if (i_rst) begin
-        for (integer i=0; i<16; i=i+1) begin
-            page_table[i] <= i[`PAGE_RES_SIZE-1:0];
+        page_table[0] <= `PAGE_RES_SIZE'h7fe;
+        page_table[1] <= `PAGE_RES_SIZE'h7ff;
+        for (integer i=2; i<16; i=i+1) begin
+            page_table[i] <= `PAGE_RES_SIZE'b0;
         end
     end else if (i_sr_we & addr_in_range)
         page_table[sr_addr_idx[`PAGE_IDX_W-1:0]] <= i_sr_data[`PAGE_RES_SIZE-1:0];

@@ -192,10 +192,11 @@ end
 // Special registers
 `define SREG_PC `RW'b0
 `define SREG_PRIV_CTRL `RW'b1
+`define SREG_JTR `RW'b10
 `define SREG_IRQ_PC `RW'b11
 `define SREG_ALU_FLAGS `RW'b100
 
-reg pc_sreg_ie, sreg_priv_control_ie, sreg_irq_pc_ie, alu_flags_sreg_ie;
+reg pc_sreg_ie, sreg_priv_control_ie, sreg_irq_pc_ie, alu_flags_sreg_ie, sreg_jtr_ie;
 wire [`RW-1:0] sreg_priv_control_out, sreg_irq_pc_out;
 always @* begin
     {pc_sreg_ie, sreg_irq_pc_ie, sreg_priv_control_ie, alu_flags_sreg_ie} = 4'b0;
@@ -211,6 +212,10 @@ always @* begin
         `SREG_IRQ_PC: begin
             sreg_out = sreg_irq_pc_out;
             sreg_irq_pc_ie = c_sreg_store;
+        end
+        `SREG_JTR: begin
+            sreg_out = {15'b0, sreg_jtr_out};
+            sreg_jtr_ie = c_sreg_store;
         end
         `SREG_ALU_FLAGS: begin
             sreg_out = {11'b0, alu_flags_q};
@@ -229,21 +234,20 @@ end
 // Special registers control
 
 wire irq_en = sreg_priv_control_out[2], sreg_priv_mode = sreg_priv_control_out[0];
-assign o_c_instr_page = sreg_priv_control_out[3];
-register #(.RESET_VAL(`RW'b1001)) sreg_priv_control (.i_clk(i_clk), .i_rst(i_rst), .i_d(priv_in), .o_d(sreg_priv_control_out),
-    .i_ie((((sreg_priv_control_ie & sreg_priv_mode) | c_sreg_irt) & exec_submit) | irq));
+register #(.RESET_VAL(`RW'b001)) sreg_priv_control (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_in), .o_d(sreg_priv_control_out),
+    .i_ie((sreg_priv_control_ie & sreg_priv_mode) & exec_submit));
 
 register sreg_irq_pc (.i_clk(i_clk), .i_rst(i_rst), .i_d(pc_val), .o_d(sreg_irq_pc_out), .i_ie(irq | sreg_irq_pc_ie));
 
-reg [`RW-1:0] priv_in;
-always @* begin
-    if (irq) // clear irq_en flag on interrupt
-        priv_in = (sreg_priv_control_out & 16'hfffb);
-    else if (c_sreg_irt) // set irq_en on return from interrupt
-        priv_in = sreg_priv_control_out | 16'h0004;
-    else
-        priv_in = sreg_in;
-end
+wire sreg_jtr_buff_o, sreg_jtr_out;
+wire jtr_jump_en = (sreg_irq_pc_ie | jump_dec_valid | c_sreg_irt) & exec_submit;
+wire jtr_irqh_write = (c_sreg_irt & exec_submit) | irq;
+wire jtr_buff_in = (irq ? 1'b0 : sreg_in[0]);
+wire jtr_in = (irq ? 1'b0 : sreg_jtr_buff_o);
+register  #(.RESET_VAL(1'b1), .N(1)) sreg_jtr_buff (.i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_buff_in), .o_d(sreg_jtr_buff_o), .i_ie(sreg_jtr_ie | jtr_irqh_write));
+register  #(.RESET_VAL(1'b1), .N(1)) sreg_jtr (.i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_in), .o_d(sreg_jtr_out), .i_ie(jtr_jump_en | jtr_irqh_write));
+
+assign o_c_instr_page = sreg_jtr_out;
 
 assign sr_bus_addr = i_imm;
 assign sr_bus_we = c_sreg_store & exec_submit;

@@ -58,7 +58,18 @@ void sim_wishbone_mem(Vdut* d) {
     }
 }
 
+void load_bootjump() {
+    // disables mem paging and jumps to 0 (0x800000)
+    mem[0xffe000] = 0x0004;
+    mem[0xffe001] = 0x0000;
+    mem[0xffe002] = 0x0011;
+    mem[0xffe003] = 0x0002;
+    mem[0xffe004] = 0x000E;
+    mem[0xffe005] = 0x0000;
+}
+
 void load_mem(std::vector<int>& instr) {
+    load_bootjump();
     for(int i=0; i<instr.size(); i++) {
         mem[0x800000 + 2*i] = instr[i] & 0xffff;
         mem[0x800000 + 2*i + 1] = instr[i] >> 16;
