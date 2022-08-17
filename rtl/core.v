@@ -21,7 +21,8 @@ module core (
     input i_irq,
     output o_c_instr_page,
     output [`RW-1:0] sr_bus_addr, sr_bus_data_o,
-    output sr_bus_we
+    output sr_bus_we,
+    output o_icache_flush
 );
 
 // --- CPU INTERNAL CONNECTIONS ---
@@ -85,7 +86,7 @@ execute execute(.i_clk(i_clk), .i_rst(i_rst), .o_ready(decode_execute_next_ready
     .c_mem_we(dec_mem_we), .o_data(ew_data), .o_addr(ew_addr), .o_reg_ie(ew_reg_ie), .o_mem_access(ew_mem_access), .o_mem_we(ew_mem_we), .o_submit(ew_submit),
     .i_next_ready(ew_next_ready), .i_reg_ie(we_reg_ie), .i_reg_data(we_reg_data), .c_used_operands(dec_used_operands), .c_sreg_load(dec_sreg_load),
     .c_sreg_store(dec_sreg_store), .c_sreg_jal_over(dec_sreg_jal_over), .i_irq(i_irq), .c_sreg_irt(dec_sreg_irt), .o_c_instr_page(o_c_instr_page),
-    .sr_bus_addr(sr_bus_addr), .sr_bus_data_o(sr_bus_data_o), .sr_bus_we(sr_bus_we));
+    .sr_bus_addr(sr_bus_addr), .sr_bus_data_o(sr_bus_data_o), .sr_bus_we(sr_bus_we), .o_icache_flush(o_icache_flush));
 
 // Pipeline stage 3 - MEM&WB
 memwb memwb(.i_clk(i_clk), .i_rst(i_rst), .i_data(ew_data), .i_addr(ew_addr), .i_reg_ie(ew_reg_ie), .i_mem_access(ew_mem_access), .i_mem_we(ew_mem_we),

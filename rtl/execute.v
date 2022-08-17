@@ -45,7 +45,8 @@ module execute (
     input i_irq,
     output o_c_instr_page,
     output [`RW-1:0] sr_bus_addr, sr_bus_data_o,
-    output sr_bus_we
+    output sr_bus_we,
+    output reg o_icache_flush
 );
 
 reg next_ready_delayed;
@@ -131,7 +132,7 @@ wire jump_mispredict = jump_dec_valid & (jump_dec_en ^ i_jmp_predict);
 wire pc_write = (pc_sreg_ie & c_sreg_store) | c_sreg_irt;
 
 always @(posedge i_clk) begin
-    o_flush <= ((jump_mispredict | pc_write) & exec_submit) | irq; // invalidate itself and all previous stages at next cycle
+    o_flush <= ((jump_mispredict | pc_write | flush_instr_mmu) & exec_submit) | irq; // invalidate itself and all previous stages at next cycle
 end
 
 `define JUMP_CODE_UNCOND`JUMP_CODE_W'b10000
@@ -234,20 +235,26 @@ end
 // Special registers control
 
 wire irq_en = sreg_priv_control_out[2], sreg_priv_mode = sreg_priv_control_out[0];
-register #(.RESET_VAL(`RW'b001)) sreg_priv_control (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_in), .o_d(sreg_priv_control_out),
-    .i_ie((sreg_priv_control_ie & sreg_priv_mode) & exec_submit));
+register #(.RESET_VAL(`RW'b001)) sreg_priv_control (.i_clk(i_clk), .i_rst(i_rst), .i_d(priv_in), .o_d(sreg_priv_control_out),
+    .i_ie((((sreg_priv_control_ie & sreg_priv_mode) | c_sreg_irt) & exec_submit) | irq));
+
+wire [`RW-1:0] priv_in = (irq ? (sreg_priv_control_out & `RW'hfffb) : (c_sreg_irt ? (sreg_priv_control_out | `RW'h0004) : sreg_in)); // disable irq flag on interrupt and re-enable on return //FIXME REENABLE
 
 register sreg_irq_pc (.i_clk(i_clk), .i_rst(i_rst), .i_d(pc_val), .o_d(sreg_irq_pc_out), .i_ie(irq | sreg_irq_pc_ie));
 
 wire sreg_jtr_buff_o, sreg_jtr_out;
 wire jtr_jump_en = (sreg_irq_pc_ie | jump_dec_valid | c_sreg_irt) & exec_submit;
-wire jtr_irqh_write = (c_sreg_irt & exec_submit) | irq;
+wire jtr_irqh_write = irq;
 wire jtr_buff_in = (irq ? 1'b0 : sreg_in[0]);
 wire jtr_in = (irq ? 1'b0 : sreg_jtr_buff_o);
 register  #(.RESET_VAL(1'b1), .N(1)) sreg_jtr_buff (.i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_buff_in), .o_d(sreg_jtr_buff_o), .i_ie(sreg_jtr_ie | jtr_irqh_write));
 register  #(.RESET_VAL(1'b1), .N(1)) sreg_jtr (.i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_in), .o_d(sreg_jtr_out), .i_ie(jtr_jump_en | jtr_irqh_write));
-
 assign o_c_instr_page = sreg_jtr_out;
+
+wire immu_write = c_sreg_store & exec_submit & (sr_bus_addr >= `RW'h100 && sr_bus_addr < `RW'h100 + 16); // flush after write to mmu is executed
+wire flush_instr_mmu = (immu_write & o_c_instr_page) | ((jtr_in ^ sreg_jtr_out) & (jtr_jump_en | jtr_irqh_write)); // & exec_submit
+always @(posedge i_clk) //FIXME: RANDOM JTR WRITE
+    o_icache_flush <= flush_instr_mmu & ~i_rst;
 
 assign sr_bus_addr = i_imm;
 assign sr_bus_we = c_sreg_store & exec_submit;

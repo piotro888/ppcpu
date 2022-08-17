@@ -83,7 +83,7 @@ bool test_interupts(Vdut* dut, VerilatedVcdC* vcd) {
         0x0002000E,
         0x0011000E,
         0x00000084,
-        0x000c0004,
+        0x00050004,
         0x00010011,
         0x00000004,
         0x00100104,
@@ -96,7 +96,7 @@ bool test_interupts(Vdut* dut, VerilatedVcdC* vcd) {
         0x03200004,
         0x0000400C,
         0x0007018E,
-        0x0016000E,
+        0x0019000E,
         0x00040190,
         0x00010488,
         0x00040C11,
@@ -105,7 +105,7 @@ bool test_interupts(Vdut* dut, VerilatedVcdC* vcd) {
         0x00000000,
         0x00050004,
         0x01000011,
-        0x0016000E};
+        0x0019000E};
     cpu_reset(dut, vcd);
     load_mem(instr);
     

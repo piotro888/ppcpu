@@ -9,7 +9,7 @@ module icache (
     input [`RW-1:0] mem_addr,
     output reg [`I_SIZE-1:0] mem_data,
     input mem_ppl_submit,
-    // think about next signals
+    input mem_cache_flush,
 
     // output interface
     output reg wb_cyc,
@@ -57,7 +57,7 @@ genvar i;
 generate
     for (i=0; i<`CACHE_ASSOC; i=i+1) begin : cache_mem
         cache_mem #(.AW(`CACHE_IDX_WIDTH), .AS(`CACHE_IDXES), .DW(`ENTRY_SIZE)) mem (
-            .i_clk(i_clk), .i_rst(i_rst), .i_addr((|cache_we) ? wire_index : input_index), .i_data(cache_mem_in),
+            .i_clk(i_clk), .i_rst(i_rst | mem_cache_flush), .i_addr((|cache_we) ? wire_index : input_index), .i_data(cache_mem_in),
             .o_data(cache_out[i]), .i_we(cache_we[i]));
         assign cache_hit[i] = (cache_out[i][`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE] == compare_tag) && cache_out[i][0]; 
     end
@@ -65,8 +65,8 @@ endgenerate
 
 assign mem_ack = cache_ghit | mem_fetch_end;
 
-wire cache_miss = cache_read_valid & ~(|cache_hit);
-wire cache_ghit = cache_read_valid & (|cache_hit);
+wire cache_miss = cache_read_valid & (~(|cache_hit) | flush_prev_cycle);
+wire cache_ghit = cache_read_valid & ((|cache_hit) & ~flush_prev_cycle);
 
 always @(posedge i_clk)
     cache_read_addr <= (submit_pending ? submit_pending_addr : mem_addr);
@@ -92,6 +92,10 @@ always @(posedge i_clk) begin
 end
 
 wire accept_ok = mem_req & ~cache_write_valid & ~cache_miss;
+
+reg flush_prev_cycle;
+always @(posedge i_clk)
+    flush_prev_cycle <= mem_cache_flush; // feedback after invalidating memortm takes 2 cycles; use this to force miss signal after 1 cycle
 
 always @(posedge i_clk) begin
     if(i_rst)
@@ -123,9 +127,20 @@ always @(posedge i_clk) begin
     end
 end
 
+reg invalidate_cache_update; // don't write pending memory request to cache after flush (fetch unit invalidates this request)
+always @(posedge i_clk) begin
+    if (i_rst) begin
+        invalidate_cache_update <= 1'b0;
+    end else if (mem_cache_flush & (|cache_we)) begin
+        invalidate_cache_update <= 1'b0;
+    end else if (mem_cache_flush & (cache_write_valid | cache_miss)) begin
+        invalidate_cache_update <= 1'b1;
+    end
+end
+
 wire [`LINE_SIZE-1:0] pre_assembled_line = {wb_i_dat, line_collect[111:0]};
 wire [`ENTRY_SIZE-1:0] cache_write_entry = {write_tag, pre_assembled_line, 1'b1};
-assign cache_we[0] = mem_fetch_end;
+assign cache_we[0] = mem_fetch_end & ~invalidate_cache_update;
 
 always @(posedge i_clk) begin
     case (line_burst_cnt)
