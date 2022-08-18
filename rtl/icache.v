@@ -38,7 +38,7 @@ assign wb_sel = 2'b11;
 
 wire [`TAG_SIZE-1:0] compare_tag = cache_read_addr[15:7];
 wire [`TAG_SIZE-1:0] write_tag = cache_write_addr[15:7];
-wire [`CACHE_IDX_WIDTH-1:0] input_index = mem_addr[6:2];
+wire [`CACHE_IDX_WIDTH-1:0] read_index = (submit_pending ?  submit_pending_addr[6:2] : mem_addr[6:2]);
 wire [`CACHE_IDX_WIDTH-1:0] wire_index = cache_write_addr[6:2];
 wire [`CACHE_OFF_W-1:0] compare_off = cache_read_addr[1:0];
 wire [`CACHE_OFF_W-1:0] write_off = cache_write_addr[1:0];
@@ -57,7 +57,7 @@ genvar i;
 generate
     for (i=0; i<`CACHE_ASSOC; i=i+1) begin : cache_mem
         cache_mem #(.AW(`CACHE_IDX_WIDTH), .AS(`CACHE_IDXES), .DW(`ENTRY_SIZE)) mem (
-            .i_clk(i_clk), .i_rst(i_rst | mem_cache_flush), .i_addr((|cache_we) ? wire_index : input_index), .i_data(cache_mem_in),
+            .i_clk(i_clk), .i_rst(i_rst | mem_cache_flush), .i_addr((|cache_we) ? wire_index : read_index), .i_data(cache_mem_in),
             .o_data(cache_out[i]), .i_we(cache_we[i]));
         assign cache_hit[i] = (cache_out[i][`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE] == compare_tag) && cache_out[i][0]; 
     end
@@ -131,7 +131,7 @@ reg invalidate_cache_update; // don't write pending memory request to cache afte
 always @(posedge i_clk) begin
     if (i_rst) begin
         invalidate_cache_update <= 1'b0;
-    end else if (mem_cache_flush & (|cache_we)) begin
+    end else if (mem_fetch_end) begin
         invalidate_cache_update <= 1'b0;
     end else if (mem_cache_flush & (cache_write_valid | cache_miss)) begin
         invalidate_cache_update <= 1'b1;
