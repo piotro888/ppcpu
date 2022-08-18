@@ -1,0 +1,5 @@
+verilator --cc -I../../rtl/ --exe --trace upper_core.v upcore_asm.cpp && \
+make -C obj_dir/ -f Vupper_core.mk Vupper_core && \
+cp obj_dir/Vupper_core archu && \
+python3 ~/opt/pcpu-tools/pas.py -v $1 && \
+./archu < out.hex
