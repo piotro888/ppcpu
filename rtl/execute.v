@@ -23,7 +23,7 @@ module execute (
     input [`JUMP_CODE_W-1:0] c_jump_cond_code,
     input c_mem_access, c_mem_we,
     input [1:0] c_used_operands,
-    input c_sreg_load, c_sreg_store, c_sreg_jal_over, c_sreg_irt,
+    input c_sreg_load, c_sreg_store, c_sreg_jal_over, c_sreg_irt, c_sys,
 
     // Signals to fetch stage to handle mispredictions
     output o_pc_update,
@@ -70,7 +70,7 @@ assign o_ready = exec_submit | ~instr_valid;
 
 // At IRQ, current instruction (and state update) is invalidated and pc is saved to sr, to
 // continue execution from current instruction. Flush is requested on next cycle
-wire irq = i_irq & irq_en;
+wire irq = (i_irq & irq_en) | prev_sys;
 
 always @(posedge i_clk) begin
     if(i_rst) begin
@@ -190,6 +190,17 @@ always @(posedge i_clk) begin
     end
 end
 
+reg prev_sys; // Execute sys instruction and trigger interrupt at next cycle to resume from next instruction
+always @(posedge i_clk) begin
+    if (i_rst) begin
+        prev_sys <= 1'b0;
+    end else if (c_sys & exec_submit) begin
+        prev_sys <= 1'b1;
+    end else begin
+        prev_sys <= 1'b0;
+    end
+end
+
 // Special registers
 `define SREG_PC `RW'b0
 `define SREG_PRIV_CTRL `RW'b1
@@ -200,7 +211,7 @@ end
 reg pc_sreg_ie, sreg_priv_control_ie, sreg_irq_pc_ie, alu_flags_sreg_ie, sreg_jtr_ie;
 wire [`RW-1:0] sreg_priv_control_out, sreg_irq_pc_out;
 always @* begin
-    {pc_sreg_ie, sreg_irq_pc_ie, sreg_priv_control_ie, alu_flags_sreg_ie} = 4'b0;
+    {pc_sreg_ie, sreg_irq_pc_ie, sreg_priv_control_ie, alu_flags_sreg_ie, sreg_jtr_ie} = 5'b0;
     case (i_imm)
         `SREG_PC: begin
             sreg_out = pc_val;
@@ -238,7 +249,7 @@ wire irq_en = sreg_priv_control_out[2], sreg_priv_mode = sreg_priv_control_out[0
 register #(.RESET_VAL(`RW'b001)) sreg_priv_control (.i_clk(i_clk), .i_rst(i_rst), .i_d(priv_in), .o_d(sreg_priv_control_out),
     .i_ie((((sreg_priv_control_ie & sreg_priv_mode) | c_sreg_irt) & exec_submit) | irq));
 
-wire [`RW-1:0] priv_in = (irq ? (sreg_priv_control_out & `RW'hfffb) : (c_sreg_irt ? (sreg_priv_control_out | `RW'h0004) : sreg_in)); // disable irq flag on interrupt and re-enable on return //FIXME REENABLE
+wire [`RW-1:0] priv_in = (irq ? (sreg_priv_control_out & `RW'hfffb) : (c_sreg_irt ? (sreg_priv_control_out | `RW'h0004) : sreg_in)); // disable irq flag on interrupt and re-enable on return
 
 register sreg_irq_pc (.i_clk(i_clk), .i_rst(i_rst), .i_d(pc_val), .o_d(sreg_irq_pc_out), .i_ie(irq | sreg_irq_pc_ie));
 
@@ -253,7 +264,7 @@ assign o_c_instr_page = sreg_jtr_out;
 
 wire immu_write = c_sreg_store & exec_submit & (sr_bus_addr >= `RW'h100 && sr_bus_addr < `RW'h100 + 16); // flush after write to mmu is executed
 wire flush_instr_mmu = (immu_write & o_c_instr_page) | ((jtr_in ^ sreg_jtr_out) & (jtr_jump_en | jtr_irqh_write)); // & exec_submit
-always @(posedge i_clk) //FIXME: RANDOM JTR WRITE
+always @(posedge i_clk)
     o_icache_flush <= flush_instr_mmu & ~i_rst;
 
 assign sr_bus_addr = i_imm;
