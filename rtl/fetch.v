@@ -22,7 +22,7 @@ module fetch (
 );
 
 assign mem_addr = (pc_reset_override ? `RW'b0 : ((i_flush | pc_flush_override) ? i_exec_pc : pred_pc));
-assign mem_submit = (((mem_ack & ~out_buffer_valid & i_next_ready) | pc_reset_override | (out_buffer_valid & out_buff_read))) & ~i_rst;
+assign mem_submit = (((mem_ack & ~out_buffer_valid & i_next_ready & ~disable_prediction) | pc_reset_override | (pc_flush_override & ~instr_wait) | (out_buffer_valid & out_buff_read & ~disable_prediction))) & ~i_rst;
 
 reg pc_reset_override;
 always @(posedge i_clk) begin
@@ -86,9 +86,11 @@ end
 
 wire [`RW-1:0] pred_pc = (branch_pred_res ? branch_pred_imm : prev_request_pc + `RW'b1);
 
-wire [`I_SIZE-1:0] branch_pred_instr = mem_data;
-wire [`RW-1:0] branch_pred_imm =  branch_pred_instr[`I_SIZE-1:`I_SIZE-`RW];
+wire [`I_SIZE-1:0] branch_pred_instr = (out_buffer_valid ? out_buffer_data_instr : mem_data);
+wire [`RW-1:0] branch_pred_imm = branch_pred_instr[`I_SIZE-1:`I_SIZE-`RW];
 
+// disable predicting after sys, irt, srs0 instructions (always ends with flush)
+wire disable_prediction = (branch_pred_instr[6:0] == 7'h12) || (branch_pred_instr[6:0] == 7'h1e) || (branch_pred_instr[6:0] == 7'h11 && ~(|branch_pred_imm));
 reg branch_pred_res;
 
 // BRANCH PREDICTION / PC DECODE
