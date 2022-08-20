@@ -11,6 +11,8 @@
 
 `define I_SIZE 32
 
+`define ADDR_BYTES 2
+
 // -- ALU --
 `define ALU_MODE_W 4
 `define ALU_MODE_L_PASS `ALU_MODE_W'b0

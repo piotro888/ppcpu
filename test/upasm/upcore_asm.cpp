@@ -45,12 +45,18 @@ void sim_wishbone_mem(Vdut* d) {
         if(--req_time <= 0) {
             d->wb_ack = 1;
             if(d->wb_we) {
-                mem[d->wb_adr] = d->wb_o_dat;
+                if(d->wb_sel & 1) {
+                    mem[d->wb_adr] &= 0xff00u;
+                    mem[d->wb_adr] |= d->wb_o_dat & 0xffu;
+                }
+                if(d->wb_sel & 2) {
+                    mem[d->wb_adr] &= 0xffu;
+                    mem[d->wb_adr] |= d->wb_o_dat & 0xff00u;
+                }
             } else {
                 d->wb_i_dat = mem[d->wb_adr];
             }
             req_time = 0;
-            //std::cout<<"memreqf "<<std::hex<<d->wb_adr<<' '<<((int)d->wb_we ? 'w' : 'r')<<' '<<(d->wb_we ? d->wb_o_dat : d->wb_i_dat)<<'\n';
             std::cout<<std::hex<<d->wb_adr<<' ';
         } else {
             d->wb_ack = 0;

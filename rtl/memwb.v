@@ -10,6 +10,7 @@ module memwb (
     input [`REGNO-1:0] i_reg_ie,
     input i_mem_access,
     input i_mem_we,
+    input i_mem_width,
 
     output [`REGNO-1:0] o_reg_ie,
     output [`RW-1:0] o_reg_data,
@@ -22,14 +23,18 @@ module memwb (
     output [`RW-1:0] o_mem_addr,
     output o_mem_we,
     input i_mem_ack,
-    input [`RW-1:0] i_mem_data
+    input [`RW-1:0] i_mem_data,
+    output [`ADDR_BYTES-1:0] o_mem_sel
 );
 
-assign o_reg_data = (i_mem_access ? i_mem_data : i_data);
+wire [`RW-1:0] mem_result = (i_mem_width ? (i_addr[0] ? (i_mem_data>>`RW'h8) : (i_mem_data&`RW'hff)) : i_mem_data);
+assign o_reg_data = (i_mem_access ? mem_result : i_data);
 
-assign o_mem_data = i_data;
-assign o_mem_addr = i_addr;
+assign o_mem_data = ((i_mem_width & i_addr[0]) ? (i_data<<`RW'h8) : i_data);
+assign o_mem_addr = (i_addr>>`RW'b1); // LSB is used for byte selection in STDMEM
 assign o_mem_we = i_mem_we;
+
+assign o_mem_sel = (i_mem_width ? (`ADDR_BYTES'b1 << i_addr[0]) : `ADDR_BYTES'b11);
 
 wire reg_ie = ((i_mem_access & i_mem_ack) | (~i_mem_access & i_submit)) & (|i_reg_ie);
 assign o_reg_ie = (reg_ie ? i_reg_ie : `REGNO'b0);

@@ -24,7 +24,7 @@ module decode (
     output reg [`REGNO_LOG-1:0] oc_l_reg_sel, oc_r_reg_sel, 
     output reg [`REGNO-1:0] oc_rf_ie,
     output reg [`JUMP_CODE_W-1:0] oc_jump_cond_code,
-    output reg oc_mem_access, oc_mem_we,
+    output reg oc_mem_access, oc_mem_we, oc_mem_width,
     output reg [1:0] oc_used_operands,
     output reg oc_sreg_load, oc_sreg_store, oc_sreg_jal_over, oc_sreg_irt, oc_sys
 );
@@ -51,6 +51,10 @@ module decode (
 `define OPC_SRS 7'h11
 `define OPC_SYS 7'h12
 `define OPC_IRT 7'h1e
+`define OPC_LD8 7'h1f
+`define OPC_LO8 7'h20
+`define OPC_SD8 7'h21
+`define OPC_SO8 7'h22
 
 wire [6:0] opcode = i_instr_l[6:0];
 wire [2:0] reg_dst = i_instr_l[9:7];
@@ -65,7 +69,7 @@ reg c_alu_carry_en, c_alu_flags_ie;
 reg [`REGNO_LOG-1:0] c_l_reg_sel, c_r_reg_sel; 
 reg [`REGNO-1:0] c_rf_ie;
 reg [`JUMP_CODE_W-1:0] c_jump_cond_code;
-reg c_mem_access, c_mem_we;
+reg c_mem_access, c_mem_we, c_mem_width;
 reg [1:0] c_used_operands;
 reg c_sreg_load, c_sreg_store, c_sreg_jal_over, c_sreg_irt, c_sys;
 
@@ -73,7 +77,7 @@ always @(*) begin
     // defaults
     c_pc_inc = 1'b1;
     {c_pc_ie, c_r_bus_imm, c_alu_carry_en, c_alu_flags_ie, c_mem_access,
-        c_mem_we, c_sreg_load, c_sreg_store, c_sreg_jal_over, c_sreg_irt, c_sys} = 11'b0;
+        c_mem_we, c_sreg_load, c_sreg_store, c_sreg_jal_over, c_sreg_irt, c_sys, c_mem_width} = 12'b0;
     c_rf_ie = `REGNO'b0;
     c_alu_mode = `ALU_MODE_W'b0;
     c_l_reg_sel = `REGNO_LOG'b0;
@@ -219,6 +223,41 @@ always @(*) begin
             c_pc_ie = 1'b0;
             c_pc_inc = 1'b0;
         end
+        `OPC_LD8: begin
+            c_r_bus_imm = 1'b1;
+            c_alu_mode = `ALU_MODE_R_PASS;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_mem_access = 1'b1;
+            c_mem_width = 1'b1;
+        end
+        `OPC_LO8: begin
+            c_l_reg_sel = reg_st;
+            c_r_bus_imm = 1'b1;
+            c_alu_mode = `ALU_MODE_ADD;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_mem_access = 1'b1;
+            c_used_operands = 2'b01;
+            c_mem_width = 1'b1;
+        end
+        `OPC_SD8: begin
+            c_r_bus_imm = 1'b1;
+            c_alu_mode = `ALU_MODE_R_PASS;
+            c_r_reg_sel = reg_st;
+            c_mem_access = 1'b1;
+            c_mem_we = 1'b1;
+            c_used_operands = 2'b01;
+            c_mem_width = 1'b1;
+        end
+        `OPC_SO8: begin
+            c_l_reg_sel = reg_nd;
+            c_r_bus_imm = 1'b1;
+            c_alu_mode = `ALU_MODE_ADD;
+            c_r_reg_sel = reg_st;
+            c_mem_access = 1'b1;
+            c_mem_we = 1'b1;
+            c_used_operands = 2'b11;
+            c_mem_width = 1'b1;
+        end
         default: begin
         end
     endcase
@@ -258,6 +297,7 @@ always @(posedge i_clk) begin
             oc_jump_cond_code <= c_jump_cond_code;
             oc_mem_access <= c_mem_access;
             oc_mem_we <= c_mem_we;
+            oc_mem_width <= c_mem_width;
             oc_used_operands <= c_used_operands;
             oc_sreg_load <= c_sreg_load;
             oc_sreg_store <= c_sreg_store;

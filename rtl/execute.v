@@ -21,7 +21,7 @@ module execute (
     input [`REGNO_LOG-1:0] c_l_reg_sel, c_r_reg_sel, 
     input [`REGNO-1:0] c_rf_ie,
     input [`JUMP_CODE_W-1:0] c_jump_cond_code,
-    input c_mem_access, c_mem_we,
+    input c_mem_access, c_mem_we, c_mem_width,
     input [1:0] c_used_operands,
     input c_sreg_load, c_sreg_store, c_sreg_jal_over, c_sreg_irt, c_sys,
 
@@ -36,7 +36,7 @@ module execute (
     output reg [`RW-1:0] o_data,
     output reg[`RW-1:0] o_addr,
     output reg [`REGNO-1:0] o_reg_ie,
-    output reg o_mem_access, o_mem_we,
+    output reg o_mem_access, o_mem_we, o_mem_width,
     output reg o_submit,
     input i_next_ready,
     input [`REGNO-1:0] i_reg_ie,
@@ -184,6 +184,7 @@ always @(posedge i_clk) begin
         o_reg_ie <= c_rf_ie;
         o_mem_access <= c_mem_access;
         o_mem_we <= c_mem_we;
+        o_mem_width <= c_mem_width;
         o_submit <= 1'b1;
     end else begin
         o_submit <= 1'b0;

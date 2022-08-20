@@ -15,6 +15,7 @@ module wishbone_adapter (
     input i_mem_req, i_mem_we,
     output o_mem_ack,
     input i_mem_next,
+    input [`WB_SEL_BITS-1:0] i_mem_sel,
 
     // Wishbone interface
     output wb_cyc,
@@ -29,14 +30,13 @@ module wishbone_adapter (
     output [`WB_SEL_BITS-1:0] wb_sel
 );
 
-assign wb_sel = 2'b11;
-
 assign wb_cyc = i_mem_req | wb_ack;
 assign wb_stb = i_mem_req;
 assign o_mem_ack = wb_ack;
 assign o_mem_data = wb_i_dat;
 assign wb_o_dat = i_mem_data;
 assign wb_we = i_mem_we;
+assign wb_sel = i_mem_sel;
 
 // same condition as for hold update, but without wb_ack, because we want to preserve old address on ack signal,
 // and update it on next edge
