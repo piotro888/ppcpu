@@ -50,6 +50,17 @@ module decode (
 `define OPC_SRL 7'h10
 `define OPC_SRS 7'h11
 `define OPC_SYS 7'h12
+`define OPC_AND 7'h13
+`define OPC_ORR 7'h14
+`define OPC_XOR 7'h15
+`define OPC_ANI 7'h16
+`define OPC_ORI 7'h17
+`define OPC_XOI 7'h18
+`define OPC_SHL 7'h19
+`define OPC_SHR 7'h1a
+`define OPC_CAI 7'h1b
+`define OPC_MUL 7'h1c // Temporary instructions (MUL,DIV) to be removed after compiler patch
+`define OPC_DIV 7'h1d
 `define OPC_IRT 7'h1e
 `define OPC_LD8 7'h1f
 `define OPC_LO8 7'h20
@@ -214,6 +225,93 @@ always @(*) begin
             c_r_reg_sel = reg_st;
             c_sreg_store = 1'b1;
             c_used_operands = 2'b01;
+        end
+        `OPC_AND: begin
+            c_alu_mode = `ALU_MODE_AND;
+            c_l_reg_sel = reg_st;
+            c_r_reg_sel = reg_nd;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_alu_flags_ie = 1'b1;
+            c_used_operands = 2'b11;
+        end
+        `OPC_ORR: begin
+            c_alu_mode = `ALU_MODE_OR;
+            c_l_reg_sel = reg_st;
+            c_r_reg_sel = reg_nd;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_alu_flags_ie = 1'b1;
+            c_used_operands = 2'b11;
+        end
+        `OPC_XOR: begin
+            c_alu_mode = `ALU_MODE_XOR;
+            c_l_reg_sel = reg_st;
+            c_r_reg_sel = reg_nd;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_alu_flags_ie = 1'b1;
+            c_used_operands = 2'b11;
+        end
+        `OPC_ANI: begin
+            c_alu_mode = `ALU_MODE_AND;
+            c_l_reg_sel = reg_st;
+            c_r_bus_imm = 1'b1;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_alu_flags_ie = 1'b1;
+            c_used_operands = 2'b01;
+        end
+        `OPC_ORI: begin
+            c_alu_mode = `ALU_MODE_OR;
+            c_l_reg_sel = reg_st;
+            c_r_bus_imm = 1'b1;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_alu_flags_ie = 1'b1;
+            c_used_operands = 2'b01;
+        end
+        `OPC_XOI: begin
+            c_alu_mode = `ALU_MODE_XOR;
+            c_l_reg_sel = reg_st;
+            c_r_bus_imm = 1'b1;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_alu_flags_ie = 1'b1;
+            c_used_operands = 2'b01;
+        end
+        `OPC_SHL: begin
+            c_alu_mode = `ALU_MODE_SHL;
+            c_l_reg_sel = reg_st;
+            c_r_reg_sel = reg_nd;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_alu_flags_ie = 1'b1;
+            c_used_operands = 2'b11;
+        end
+        `OPC_SHR: begin
+            c_alu_mode = `ALU_MODE_SHR;
+            c_l_reg_sel = reg_st;
+            c_r_reg_sel = reg_nd;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_alu_flags_ie = 1'b1;
+            c_used_operands = 2'b11;
+        end
+        `OPC_CAI: begin
+            c_alu_mode = `ALU_MODE_AND;
+            c_l_reg_sel = reg_st;
+            c_r_reg_sel = reg_nd;
+            c_alu_flags_ie = 1'b1;
+            c_used_operands = 2'b11;
+        end
+        `OPC_MUL: begin
+            c_alu_mode = `ALU_MODE_MUL;
+            c_l_reg_sel = reg_st;
+            c_r_reg_sel = reg_nd;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_alu_flags_ie = 1'b1;
+            c_used_operands = 2'b11;
+        end
+        `OPC_DIV: begin
+            c_alu_mode = `ALU_MODE_DIV;
+            c_l_reg_sel = reg_st;
+            c_r_reg_sel = reg_nd;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_alu_flags_ie = 1'b1;
+            c_used_operands = 2'b11;
         end
         `OPC_SYS: begin
             c_sys = 1'b1;
