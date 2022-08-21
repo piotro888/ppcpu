@@ -43,7 +43,7 @@ module execute (
     input [`RW-1:0] i_reg_data,
 
     input i_irq,
-    output o_c_instr_page,
+    output o_c_instr_page, o_c_data_page,
     output [`RW-1:0] sr_bus_addr, sr_bus_data_o,
     output sr_bus_we,
     output reg o_icache_flush
@@ -246,11 +246,13 @@ end
 
 // Special registers control
 
-wire irq_en = sreg_priv_control_out[2], sreg_priv_mode = sreg_priv_control_out[0];
+
+wire [`RW-1:0] priv_in = (irq ? (sreg_priv_control_out & `RW'hfffb) : (c_sreg_irt ? (sreg_priv_control_out | `RW'h0004) : sreg_in)); // disable irq flag on interrupt and re-enable on return
 register #(.RESET_VAL(`RW'b001)) sreg_priv_control (.i_clk(i_clk), .i_rst(i_rst), .i_d(priv_in), .o_d(sreg_priv_control_out),
     .i_ie((((sreg_priv_control_ie & sreg_priv_mode) | c_sreg_irt) & exec_submit) | irq));
 
-wire [`RW-1:0] priv_in = (irq ? (sreg_priv_control_out & `RW'hfffb) : (c_sreg_irt ? (sreg_priv_control_out | `RW'h0004) : sreg_in)); // disable irq flag on interrupt and re-enable on return
+wire irq_en = sreg_priv_control_out[2], sreg_priv_mode = sreg_priv_control_out[0];
+assign o_c_data_page = sreg_priv_control_out[1];
 
 register sreg_irq_pc (.i_clk(i_clk), .i_rst(i_rst), .i_d(pc_val), .o_d(sreg_irq_pc_out), .i_ie(irq | sreg_irq_pc_ie));
 
