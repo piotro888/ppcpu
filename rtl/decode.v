@@ -130,7 +130,7 @@ always @(*) begin
             c_r_reg_sel = reg_st;
             c_mem_access = 1'b1;
             c_mem_we = 1'b1;
-            c_used_operands = 2'b01;
+            c_used_operands = 2'b10;
         end
         `OPC_STO: begin
             c_l_reg_sel = reg_nd;
@@ -224,7 +224,7 @@ always @(*) begin
         `OPC_SRS: begin
             c_r_reg_sel = reg_st;
             c_sreg_store = 1'b1;
-            c_used_operands = 2'b01;
+            c_used_operands = 2'b10;
         end
         `OPC_AND: begin
             c_alu_mode = `ALU_MODE_AND;
@@ -343,7 +343,7 @@ always @(*) begin
             c_r_reg_sel = reg_st;
             c_mem_access = 1'b1;
             c_mem_we = 1'b1;
-            c_used_operands = 2'b01;
+            c_used_operands = 2'b10;
             c_mem_width = 1'b1;
         end
         `OPC_SO8: begin
