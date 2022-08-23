@@ -293,9 +293,9 @@ always @(*) begin
         `OPC_CAI: begin
             c_alu_mode = `ALU_MODE_AND;
             c_l_reg_sel = reg_st;
-            c_r_reg_sel = reg_nd;
+            c_r_bus_imm = 1'b1;
             c_alu_flags_ie = 1'b1;
-            c_used_operands = 2'b11;
+            c_used_operands = 2'b01;
         end
         `OPC_MUL: begin
             c_alu_mode = `ALU_MODE_MUL;
