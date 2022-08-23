@@ -40,7 +40,7 @@ always @* begin
     endcase
 
     o_flags[`ALU_FLAG_Z] = ~(|outc[`RW-1:0]);
-    o_flags[`ALU_FLAG_C] = outc[`RW] ^ (i_mode == `ALU_MODE_SUB);
+    o_flags[`ALU_FLAG_C] = outc[`RW];
     o_flags[`ALU_FLAG_N] = outc[`RW-1];
     o_flags[`ALU_FLAG_O] = (i_l[`RW-1] ^ (i_r[`RW-1]^(i_mode == `ALU_MODE_SUB))) & ((i_l[`RW-1]^outc[`RW-1]));
     o_flags[`ALU_FLAG_P] = ^outc[`RW-1:0];
