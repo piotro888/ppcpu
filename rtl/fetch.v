@@ -77,10 +77,10 @@ always @(posedge i_clk) begin
         prev_request_pc <= mem_addr;
 end
 
-wire current_req_branch_pred = (mem_submit ? branch_pred_res : prev_req_branch_pred);
+wire current_req_branch_pred = (mem_ack ? branch_pred_res : prev_req_branch_pred);
 reg prev_req_branch_pred;
 always @(posedge i_clk) begin
-    if(mem_submit)
+    if(mem_ack)
         prev_req_branch_pred <= branch_pred_res;
 end
 
