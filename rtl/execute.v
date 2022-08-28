@@ -263,7 +263,7 @@ register #(.RESET_VAL(`RW'b001)) sreg_priv_control (.i_clk(i_clk), .i_rst(i_rst)
 wire irq_en = sreg_priv_control_out[2], sreg_priv_mode = sreg_priv_control_out[0];
 assign o_c_data_page = sreg_priv_control_out[1];
 
-register sreg_irq_pc (.i_clk(i_clk), .i_rst(i_rst), .i_d(pc_val), .o_d(sreg_irq_pc_out), .i_ie(irq | sreg_irq_pc_ie));
+register sreg_irq_pc (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_pc_ie ? sreg_in : pc_val), .o_d(sreg_irq_pc_out), .i_ie(irq | (sreg_irq_pc_ie & exec_submit)));
 
 wire sreg_jtr_buff_o, sreg_jtr_out;
 wire jtr_jump_en = (sreg_irq_pc_ie | jump_dec_valid | c_sreg_irt) & exec_submit;
