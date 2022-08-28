@@ -208,11 +208,13 @@ end
 `define SREG_JTR `RW'b10
 `define SREG_IRQ_PC `RW'b11
 `define SREG_ALU_FLAGS `RW'b100
+`define SREG_IRQ_FLAGS `RW'b101
+`define SREG_SCRATCH `RW'b110
 
-reg pc_sreg_ie, sreg_priv_control_ie, sreg_irq_pc_ie, alu_flags_sreg_ie, sreg_jtr_ie;
-wire [`RW-1:0] sreg_priv_control_out, sreg_irq_pc_out;
+reg pc_sreg_ie, sreg_priv_control_ie, sreg_irq_pc_ie, alu_flags_sreg_ie, sreg_jtr_ie, sreg_scratch_ie;
+wire [`RW-1:0] sreg_priv_control_out, sreg_irq_pc_out, sreg_scratch_out;
 always @* begin
-    {pc_sreg_ie, sreg_irq_pc_ie, sreg_priv_control_ie, alu_flags_sreg_ie, sreg_jtr_ie} = 5'b0;
+    {pc_sreg_ie, sreg_irq_pc_ie, sreg_priv_control_ie, alu_flags_sreg_ie, sreg_jtr_ie, sreg_scratch_ie} = 6'b0;
     case (i_imm)
         `SREG_PC: begin
             sreg_out = pc_val;
@@ -233,6 +235,13 @@ always @* begin
         `SREG_ALU_FLAGS: begin
             sreg_out = {11'b0, alu_flags_q};
             alu_flags_sreg_ie = c_sreg_store;
+        end
+        `SREG_IRQ_FLAGS: begin
+            sreg_out = {15'b0, sreg_syscall};
+        end
+        `SREG_SCRATCH: begin
+            sreg_out = sreg_scratch_out;
+            sreg_scratch_ie = c_sreg_store;
         end
         default:
             sreg_out = 16'b0;
@@ -264,6 +273,11 @@ wire jtr_in = (irq ? 1'b0 : sreg_jtr_buff_o);
 register  #(.RESET_VAL(1'b1), .N(1)) sreg_jtr_buff (.i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_buff_in), .o_d(sreg_jtr_buff_o), .i_ie(sreg_jtr_ie | jtr_irqh_write));
 register  #(.RESET_VAL(1'b1), .N(1)) sreg_jtr (.i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_in), .o_d(sreg_jtr_out), .i_ie(jtr_jump_en | jtr_irqh_write));
 assign o_c_instr_page = sreg_jtr_out;
+
+register sreg_scratch (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_in), .o_d(sreg_scratch_out), .i_ie(sreg_scratch_ie & exec_submit));
+
+wire sreg_syscall;
+register #(.N(1)) sreg_irq_flags (.i_clk(i_clk), .i_rst(i_rst), .i_d(prev_sys), .o_d(sreg_syscall), .i_ie(irq));
 
 wire immu_write = c_sreg_store & exec_submit & (sr_bus_addr >= `RW'h100 && sr_bus_addr < `RW'h100 + 16); // flush after write to mmu is executed
 wire flush_instr_mmu = (immu_write & o_c_instr_page) | ((jtr_in ^ sreg_jtr_out) & (jtr_jump_en | jtr_irqh_write)); // & exec_submit
