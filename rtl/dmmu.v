@@ -9,6 +9,7 @@ module dmmu (
 
     input [`IN_ADDR_W-1:0] i_addr,
     output [`OUT_ADDR_W-1:0] o_addr,
+    output o_cacheable,
 
     wire [`RW-1:0] i_sr_addr,
     wire [`RW-1:0] i_sr_data,
@@ -46,5 +47,6 @@ wire [`OUT_ADDR_W-1:0] page_disable_address = {`PAGE_DEFAULT_PREFIX, i_addr[`IN_
 wire [`OUT_ADDR_W-1:0] page_enable_address = {page_res, page_off};
 
 assign o_addr = c_pag_en ? page_enable_address : page_disable_address;
+assign o_cacheable = (o_addr >= `OUT_ADDR_W'h100000 && o_addr < `OUT_ADDR_W'h800000);
 
 endmodule
