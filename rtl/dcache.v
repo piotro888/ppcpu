@@ -21,6 +21,7 @@ module dcache (
     output [`WB_ADDR_W-1:0]  wb_adr,
     output reg wb_we,
     output [1:0] wb_sel,
+    output wb_4_burst,
     input wb_ack
 
     // TODO: Multicore MSI cache protocol
@@ -114,6 +115,7 @@ wire wb_sel_adr_source = (state == `S_MISS_WR) | (state == `S_CREAD && cache_gmi
 
 assign wb_adr = (wb_sel_adr_source ? {old_entry_addr[`WB_ADDR_W-1:2], line_burst_cnt} : {mem_addr[`WB_ADDR_W-1:2], line_burst_cnt});
 assign wb_sel = (mem_cache_enable ? 2'b11 : mem_sel);
+assign wb_4_burst = mem_cache_enable;
 
 wire [`CACHE_ASSOC_W-1:0] write_sel_idx = 2'b0;
 
