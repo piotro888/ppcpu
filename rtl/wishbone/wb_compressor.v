@@ -30,7 +30,9 @@ wire [`RW-1:0] cw_io_i = cw_io;
 `define S_IDLE `SW'b0
 `define S_HDR_1 `SW'b1
 `define S_WACK `SW'b10
-`define S_DATA `SW'b11
+`define S_DATA_R `SW'b11
+`define S_DATA_W `SW'b101
+`define S_DATA_WT `SW'b111
 `define S_WC `SW'b100
 reg [`SW-1:0] state;
 
@@ -74,15 +76,12 @@ always @(posedge i_clk) begin
             end
             `S_WACK: begin
                 if (cw_ack)
-                    state <= `S_DATA;
+                    state <= (l_we ? `S_DATA_W : `S_DATA_R);
                 cw_io_o <= wb_o_dat;
             end
-            `S_DATA: begin
-                cw_dir <= ~l_we;
+            `S_DATA_R: begin
+                cw_dir <= 1'b1;
                 cw_io_o <= wb_o_dat;
-
-                // if (wb_ack && wb_adr != ack_exp_adr) 
-                //     wb_err <= 1'b1;
                 
                 wb_ack <= 1'b0;
 
@@ -102,8 +101,41 @@ always @(posedge i_clk) begin
 
                 // TODO: HANDLE ERR (and emit err if wbadr diff from exp when ack enabled)
             end
+            `S_DATA_W: begin
+                cw_dir <= 1'b0;
+                wb_ack <= 1'b0;
+                cw_req <= 1'b0;
+
+                if (xfer_ack && burst_cnt != burst_end) begin
+                    burst_cnt <= burst_cnt + 1'b1;
+                    wb_ack <= 1'b1;
+                    wb_i_dat <= cw_io_i;
+                    ack_exp_adr <= wb_exp_adr;
+                    state <= `S_DATA_WT;
+                end else if (xfer_ack && burst_cnt == burst_end) begin
+                    burst_cnt <= `MAX_BRST_LOG'b0;
+                    wb_ack <= 1'b1;
+                    wb_i_dat <= cw_io_i;
+                    state <= `S_WC;
+                    cw_dir <= ~cw_dir;
+                    ack_exp_adr <= wb_exp_adr;
+                end
+            end
+            `S_DATA_WT: begin
+                cw_req <= 1'b0;
+                wb_ack <= 1'b0;
+                // wait for new data and send sync signal
+                // continous data delivery with clock sychronizers is not possible, due to ACK delay
+                // it causes no problem with read burst, beacause wishbone communication is unidirectional then
+                if (wb_cyc & wb_stb & ~wb_ack) begin // wait for stb reassert when new burst data is delivered
+                    cw_req <= 1'b1;
+                    cw_io_o <= wb_o_dat;
+                    state <= `S_DATA_W;
+                end
+            end
             `S_WC: begin
                 cw_dir <= 1'b0;
+                cw_req <= 1'b0;
                 wb_ack <= 1'b0;
                 state <= `S_IDLE;
             end
@@ -111,53 +143,7 @@ always @(posedge i_clk) begin
     end
 end
 
+`undef S_DATA_R
+`undef S_DATA_W
 
 endmodule
-/*
-
-`define MAX_DIV 16
-`define MAX_DIV_LOG 4
-
-module clock_div (
-    input i_clk,
-    input i_rst,
-
-    output reg o_clk,
-
-    input [`MAX_DIV_LOG-1:0] div,
-    input div_we
-);
-
-
-reg [`MAX_DIV-1:0] cnter;
-reg [`MAX_DIV_LOG-1:0] curr_div;
-
-always @(posedge i_clk) begin
-    if (i_rst) begin
-        cnter <= `MAX_DIV'b0;
-    end else if (~cnter[curr_div]) begin
-        cnter <= cnter + `MAX_DIV'b1;
-    end else begin
-        cnter <= `MAX_DIV'b0;
-    end
-end
-
-always @(posedge i_clk) begin
-    if(i_rst)
-        o_clk <= 1'b0;
-    else begin
-        if (cnter[curr_div])
-            o_clk <= ~o_clk;
-    end
-end
-
-always @(posedge i_clk) begin
-    if(i_rst)
-        curr_div <= `MAX_DIV_LOG'b1111;
-    else if (div_we)
-        curr_div <= div;
-end
-
-endmodule
-
-*/
