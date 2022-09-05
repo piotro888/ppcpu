@@ -3,23 +3,17 @@
 `define WB_DATA_W 16 
 `define WB_SEL_BITS 2
 
-module tb_upcomp (
+module top_cw (
     input wire i_clk,
     input wire i_rst,
 
-    output wb_clk,
-    output wb_cyc,
-    output reg wb_stb,
-    output reg [`WB_DATA_W-1:0] wb_o_dat,
-    input [`WB_DATA_W-1:0] wb_i_dat,
-    output reg [`WB_ADDR_W-1:0]  wb_adr,
-    output reg wb_we,
-    input wb_ack,
-    input wb_err,
-    output reg [`WB_SEL_BITS-1:0] wb_sel,
-
-    input i_irq,
-    output [`RW-1:0] dbg_r0, dbg_pc
+    inout reg [`RW-1:0] cw_io,
+    output cw_req,
+    output cw_dir,
+    input cw_ack,
+    input cw_err,
+    output cw_clk,
+    input i_irq
 );
 
 wire u_wb_8_burst, u_wb_4_burst;
@@ -33,11 +27,7 @@ wire u_wb_ack;
 wire u_wb_err;
 wire [`WB_SEL_BITS-1:0] u_wb_sel;
 
-wire [`RW-1:0] cw_io;
-wire cw_req;
-wire cw_dir;
-wire cw_ack;
-wire cw_err;
+wire [`RW-1:0] ignore_dbg_r0, ignore_dbg_pc;
 
 upper_core upc (
     .i_clk(i_clk),
@@ -53,8 +43,8 @@ upper_core upc (
     .wb_sel(u_wb_sel),
     .i_irq(irq_s),
     .wb_rty(1'b0),
-    .dbg_r0(dbg_r0),
-    .dbg_pc(dbg_pc),
+    .dbg_r0(ignore_dbg_r0),
+    .dbg_pc(ignore_dbg_pc),
     .wb_4_burst(u_wb_4_burst),
     .wb_8_burst(u_wb_8_burst)
 );
@@ -135,29 +125,9 @@ wb_compressor wb_compressor(
     .wb_8_burst(c_wb_8_burst)
 );
 
-wb_decomp wb_decomp (
-    .i_clk(cmp_clk),
-    .i_rst(cw_rst),
-
-    .cw_io(cw_io),
-    .cw_req(cw_req),
-    .cw_dir(cw_dir),
-    .cw_ack(cw_ack),
-    .cw_err(cw_err),
-
-    .wb_cyc(wb_cyc),
-    .wb_stb(wb_stb),
-    .wb_o_dat(wb_o_dat),
-    .wb_i_dat(wb_i_dat),
-    .wb_adr(wb_adr),
-    .wb_we(wb_we),
-    .wb_ack(wb_ack),
-    .wb_err(wb_err),
-    .wb_sel(wb_sel)
-);
-assign wb_clk = cmp_clk;
-
+assign cw_clk = cmp_clk;
 wire cw_rst, s_rst;
+
 reset_sync rst_clk_sync (
     .i_clk(i_clk),
     .i_rst(i_rst),
@@ -165,7 +135,7 @@ reset_sync rst_clk_sync (
 );
 
 reset_sync rst_cw_sync (
-    .i_clk(cmp_clk),
+    .i_clk(cw_clk),
     .i_rst(i_rst),
     .o_rst(cw_rst)
 );

@@ -2,6 +2,9 @@ module ff_mb_sync #(parameter DATA_W = 1) (
     input src_clk,
     input dst_clk,
 
+    input src_rst,
+    input dst_rst,
+
     input [DATA_W-1:0] i_data,
     output [DATA_W-1:0] o_data,
 
@@ -15,23 +18,31 @@ always @(posedge src_clk) begin
 end
 
 reg s_xfer_xor_flag;
-always @(posedge src_clk) begin // RESET
-    if (i_xfer_req)
+always @(posedge src_clk) begin
+    if(src_rst)
+        s_xfer_xor_flag <= 1'b0;
+    else if (i_xfer_req)
         s_xfer_xor_flag <= ~s_xfer_xor_flag;
 end
 
 reg [2:0] d_xfer_xor_sync;
 always @(posedge dst_clk) begin
-    d_xfer_xor_sync[0] <= s_xfer_xor_flag;
-    d_xfer_xor_sync[1] <= d_xfer_xor_sync[0];
-    d_xfer_xor_sync[2] <= d_xfer_xor_sync[1];
+    if(dst_rst) begin
+        d_xfer_xor_sync[2:0] <= 3'b0;
+    end else begin
+        d_xfer_xor_sync[0] <= s_xfer_xor_flag;
+        d_xfer_xor_sync[1] <= d_xfer_xor_sync[0];
+        d_xfer_xor_sync[2] <= d_xfer_xor_sync[1];
+    end
 end
 
 wire d_xfer_flag = d_xfer_xor_sync[1] ^ d_xfer_xor_sync[2];
 
 reg [DATA_W-1:0] d_data;
 always @(posedge dst_clk) begin
-    if(d_xfer_flag)
+    if(dst_rst)
+        d_data <= 'b0;
+    else if(d_xfer_flag)
         d_data <= s_data_ff;
 end
 
