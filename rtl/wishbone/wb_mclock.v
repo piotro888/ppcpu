@@ -45,7 +45,7 @@ always @(posedge clk_m) begin
         m_burst_cnt <= `MAX_BURST_LOG'b0;
     end else if (m_new_req & ~(|m_burst_cnt)) begin
         m_new_req_flag <= ~m_new_req_flag;
-       if (m_wb_we)
+        if (m_wb_we)
             m_burst_cnt <= `MAX_BURST_LOG'd1; // burst write is not possible, as new data must be transmitted after each ack, which causes delay
                                               // although burst signal is passed for later optimization of compressed bus write
         else
@@ -106,11 +106,14 @@ wire ssy_newreq = prev_xor_newreq ^ ssy_flag_newreq;
 
 // S->M ff sync
 `define SM_SYNC_W 2+16
-reg [`SM_SYNC_W-1:0] smsync0, smsync1;
-always @(posedge clk_m) begin
-    smsync0 <= {s_wb_i_dat, err_xor_flag, ack_xor_flag};
-    smsync1 <= smsync0;
-end
+wire [`SM_SYNC_W-1:0] smsync1;
+ff_mb_sync #(.DATA_W(`SM_SYNC_W)) s_m_sync (
+    .src_clk(clk_s),
+    .dst_clk(clk_m),
+    .i_data({s_wb_i_dat, err_xor_flag^s_wb_err, ack_xor_flag^s_wb_ack}),
+    .o_data(smsync1),
+    .i_xfer_req(s_wb_ack | s_wb_err) // NOTE: CLOCK MUST BE DIVIDED BY >4 TO NOT VIOLATE 3 CYCLE DELAY (to dst clock) 
+);
 
 assign m_wb_i_dat = smsync1[17:2];
 assign m_wb_ack = msy_flag_ack; 
@@ -120,11 +123,15 @@ wire msy_xor_err = smsync1[1];
 
 // M->S ff sync
 `define MS_SYNC_W 1+24+16+1+2+2+1
-reg [`MS_SYNC_W-1:0] mssync0, mssync1;
-always @(posedge clk_s) begin
-    mssync0 <= {m_wb_cyc, m_wb_adr, m_wb_o_dat, m_wb_we, m_wb_sel, m_wb_4_burst, m_wb_8_burst, m_new_req_flag};
-    mssync1 <= mssync0;
-end
+wire [`MS_SYNC_W-1:0] mssync1;
+
+ff_mb_sync #(.DATA_W(`MS_SYNC_W)) m_s_sync (
+    .src_clk(clk_m),
+    .dst_clk(clk_s),
+    .i_data({m_wb_cyc, m_wb_adr, m_wb_o_dat, m_wb_we, m_wb_sel, m_wb_4_burst, m_wb_8_burst, ~m_new_req_flag}),
+    .o_data(mssync1),
+    .i_xfer_req(m_new_req & ~(|m_burst_cnt))
+);
 
 wire ssy_flag_newreq = mssync1[0]; 
 assign s_wb_8_burst = mssync1[1];
@@ -136,3 +143,5 @@ assign s_wb_adr = mssync1[45:22];
 assign s_wb_cyc = mssync1[46];
 
 endmodule
+
+`include "ff_mb_sync.v"
