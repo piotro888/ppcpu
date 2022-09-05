@@ -48,7 +48,7 @@ reg l_we;
 `define MAX_BRST_LOG 3
 reg [`MAX_BRST_LOG-1:0] burst_end, burst_cnt;
 
-wire xfer_ack = (cw_ack && wb_cyc && wb_stb);
+wire xfer_ack = ((cw_ack | cw_err) && wb_cyc && wb_stb);
 
 always @(posedge i_clk) begin
     if (i_rst) begin
@@ -84,37 +84,41 @@ always @(posedge i_clk) begin
                 cw_io_o <= wb_o_dat;
                 
                 wb_ack <= 1'b0;
+                wb_err <= 1'b0;
 
                 if (xfer_ack && burst_cnt != burst_end) begin
                     burst_cnt <= burst_cnt + 1'b1;
-                    wb_ack <= 1'b1; // It is good idea to break combinational path at end of IC
+                    wb_ack <= cw_ack; // It is good idea to break combinational path at end of IC
+                    wb_err <= cw_err;
                     wb_i_dat <= cw_io_i;
                     ack_exp_adr <= wb_exp_adr;
                 end else if (xfer_ack && burst_cnt == burst_end) begin
                     burst_cnt <= `MAX_BRST_LOG'b0;
-                    wb_ack <= 1'b1;
+                    wb_ack <= cw_ack;
+                    wb_err <= cw_err;
                     wb_i_dat <= cw_io_i;
                     state <= `S_WC;
                     cw_dir <= ~cw_dir;
                     ack_exp_adr <= wb_exp_adr;
                 end
-
-                // TODO: HANDLE ERR (and emit err if wbadr diff from exp when ack enabled)
             end
             `S_DATA_W: begin
                 cw_dir <= 1'b0;
                 wb_ack <= 1'b0;
+                wb_err <= 1'b0;
                 cw_req <= 1'b0;
 
                 if (xfer_ack && burst_cnt != burst_end) begin
                     burst_cnt <= burst_cnt + 1'b1;
-                    wb_ack <= 1'b1;
+                    wb_ack <= cw_ack;
+                    wb_err <= cw_err;
                     wb_i_dat <= cw_io_i;
                     ack_exp_adr <= wb_exp_adr;
                     state <= `S_DATA_WT;
                 end else if (xfer_ack && burst_cnt == burst_end) begin
                     burst_cnt <= `MAX_BRST_LOG'b0;
-                    wb_ack <= 1'b1;
+                    wb_ack <= cw_ack;
+                    wb_err <= cw_err;
                     wb_i_dat <= cw_io_i;
                     state <= `S_WC;
                     cw_dir <= ~cw_dir;
@@ -124,6 +128,7 @@ always @(posedge i_clk) begin
             `S_DATA_WT: begin
                 cw_req <= 1'b0;
                 wb_ack <= 1'b0;
+                wb_err <= 1'b0;
                 // wait for new data and send sync signal
                 // continous data delivery with clock sychronizers is not possible, due to ACK delay
                 // it causes no problem with read burst, beacause wishbone communication is unidirectional then
@@ -137,6 +142,7 @@ always @(posedge i_clk) begin
                 cw_dir <= 1'b0;
                 cw_req <= 1'b0;
                 wb_ack <= 1'b0;
+                wb_err <= 1'b0;
                 state <= `S_IDLE;
             end
         endcase

@@ -22,7 +22,8 @@ module dcache (
     output reg wb_we,
     output [1:0] wb_sel,
     output wb_4_burst,
-    input wb_ack
+    input wb_ack,
+    input wb_err
 
     // TODO: Multicore MSI cache protocol
 );
@@ -75,11 +76,13 @@ endgenerate
 wire cache_ghit = (state == `S_CREAD) && (|cache_hit);
 wire cache_gmiss = (state == `S_CREAD) && ~(|cache_hit);
 
-wire mem_op_end = wb_cyc & wb_stb & wb_ack & (&line_burst_cnt);
+wire mem_op_end = wb_cyc & wb_stb & (wb_ack | wb_err) & (&line_burst_cnt);
 wire mem_fetch_end = (state == `S_MISS_RD) && mem_op_end;
 wire write_to_cache = (state == `S_RQ_WR);
 
-assign mem_ack = (state == `S_CREAD && ~mem_we && cache_ghit) | (mem_fetch_end && ~mem_we) | (state == `S_RQ_WR) | (state == `S_NOCACHE && wb_cyc && wb_stb && wb_ack);
+assign mem_ack = (state == `S_CREAD && ~mem_we && cache_ghit) | (mem_fetch_end && ~mem_we) | (state == `S_RQ_WR) | (state == `S_NOCACHE && wb_cyc && wb_stb && (wb_ack | wb_err));
+// TODO: Emit exception on bus error and retry bus instruction 
+//assign mem_bus_err_flush = (state == `S_NOCACHE && wb_cyc && wb_stb && wb_err) | (mem_fetch_end && ~mem_we && transfer_bus_err_w) | (state == `S_RQ_WR && transfer_bus_err_w);
 
 always @(posedge i_clk) begin
     if (i_rst) begin
@@ -106,7 +109,7 @@ always @(posedge i_clk) begin
         state <= `S_MISS_RD;
     end else if (state == `S_RQ_WR) begin
         state <= `S_IDLE;
-    end else if (state == `S_NOCACHE && wb_cyc && wb_stb && wb_ack) begin
+    end else if (state == `S_NOCACHE && wb_cyc && wb_stb && (wb_ack | wb_err)) begin
         state <= `S_IDLE;
     end
 end
@@ -119,7 +122,7 @@ assign wb_4_burst = mem_cache_enable;
 
 wire [`CACHE_ASSOC_W-1:0] write_sel_idx = 2'b0;
 
-assign cache_we[0] = mem_fetch_end | write_to_cache;
+assign cache_we[0] = (mem_fetch_end & ~transfer_bus_err_w) | write_to_cache;
 assign cache_mem_in = (write_to_cache ? cache_update_entry : {cache_compare_tag, pre_assembled_line, 2'b01});
 
 wire entry_dirty = &cache_out[write_sel_idx][`DIRTY_BIT:`VALID_BIT];
@@ -128,27 +131,34 @@ wire [`WB_ADDR_W-1:0] old_entry_addr = {write_source_entry[`ENTRY_SIZE-1:`ENTRY_
 reg [`LINE_SIZE-1:0] line_collect;
 wire [`LINE_SIZE-1:0] pre_assembled_line = {wb_i_dat, line_collect[47:0]};
 
+reg transfer_bus_err;
+wire transfer_bus_err_w = transfer_bus_err | (wb_cyc & wb_stb & wb_err);
+
 reg [`CACHE_OFF_W-1:0] line_burst_cnt;
 always @(posedge i_clk) begin
     if (i_rst) begin
         wb_cyc <= 1'b0;
         wb_stb <= 1'b0;
+        transfer_bus_err <= 1'b0;
     end else if (state == `S_IDLE && mem_req && ~mem_cache_enable) begin
         wb_cyc <= 1'b1;
         wb_stb <= 1'b1;
         wb_we <= mem_we;
         line_burst_cnt <= mem_addr[1:0];
+        transfer_bus_err <= 1'b0;
     end else if (cache_gmiss || (state == `S_MISS_WR && mem_op_end)) begin
         line_burst_cnt <= 2'b0;
         wb_cyc <= 1'b1;
         wb_stb <= 1'b1;
         wb_we <= entry_dirty & ~mem_op_end;
-    end else if (mem_op_end || (state == `S_NOCACHE && wb_cyc & wb_stb & wb_ack)) begin
+        transfer_bus_err <= transfer_bus_err & ~cache_gmiss; // clear error only on new request. Don't update cache if first write failed
+    end else if (mem_op_end || (state == `S_NOCACHE && wb_cyc & wb_stb & (wb_ack | wb_err))) begin
         line_burst_cnt <= 2'b0;
         wb_cyc <= 1'b0;
         wb_stb <= 1'b0;
-    end else if (wb_cyc & wb_stb & wb_ack) begin
+    end else if (wb_cyc & wb_stb & (wb_ack | wb_err)) begin
         line_burst_cnt <= line_burst_cnt + 1'b1;
+        transfer_bus_err <= transfer_bus_err | wb_err;
     end
 end
 

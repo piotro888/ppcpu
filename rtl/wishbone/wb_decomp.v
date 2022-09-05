@@ -53,6 +53,7 @@ always @(posedge i_clk) begin
         case (state) 
             default: begin
                 cw_ack <= 1'b0;
+                cw_err <= 1'b0;
                 wb_cyc <= 1'b0;
                 wb_stb <= 1'b0;
                 if (cw_req & cw_io_i[0]) begin
@@ -76,12 +77,15 @@ always @(posedge i_clk) begin
             end
             `S_DATA_R: begin
                 cw_ack <= 1'b0;
-                if (wb_ack && burst_cnt != burst_end) begin
-                    cw_ack <= 1'b1;
+                cw_err <= 1'b0;
+                if ((wb_ack | wb_err) && burst_cnt != burst_end) begin
+                    cw_ack <= wb_ack;
+                    cw_err <= wb_err;
                     burst_cnt <= burst_cnt + `MAX_BRST_LOG'b1;
                     cw_io_o <= wb_i_dat;
-                end else if (wb_ack && burst_cnt == burst_end) begin
-                    cw_ack <= 1'b1;
+                end else if ((wb_ack | wb_err) && burst_cnt == burst_end) begin
+                    cw_ack <= wb_ack;
+                    cw_err <= wb_err;
                     wb_stb <= 1'b0;
                     state <= `S_IDLE;
                     cw_io_o <= wb_i_dat;
@@ -100,12 +104,15 @@ always @(posedge i_clk) begin
                 end
 
                 cw_ack <= 1'b0;
-                if (wb_ack && burst_cnt != burst_end) begin
-                    cw_ack <= 1'b1;
+                cw_err <= 1'b0;
+                if ((wb_ack | wb_err) && burst_cnt != burst_end) begin
+                    cw_ack <= wb_ack;
+                    cw_err <= wb_err;
                     wb_stb <= 1'b0;
                     burst_cnt <= burst_cnt + `MAX_BRST_LOG'b1;
-                end else if (wb_ack && burst_cnt == burst_end) begin
-                    cw_ack <= 1'b1;
+                end else if ((wb_ack | wb_err) && burst_cnt == burst_end) begin
+                    cw_ack <= wb_ack;
+                    cw_err <= wb_err;
                     wb_cyc <= 1'b0;
                     wb_stb <= 1'b0;
                     state <= `S_IDLE;

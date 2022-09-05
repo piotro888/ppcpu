@@ -18,7 +18,8 @@ module icache (
     output [`RW-1:0]  wb_adr,
     output reg wb_we,
     input wb_ack,
-    output [1:0] wb_sel
+    output [1:0] wb_sel,
+    input wb_err
 );
 
 assign wb_sel = 2'b11;
@@ -104,26 +105,31 @@ always @(posedge i_clk) begin
         cache_read_valid <= accept_ok & (submit_pending | mem_ppl_submit);
 end
 
-wire mem_fetch_end = wb_cyc & wb_stb & wb_ack & (&line_burst_cnt);
+wire mem_fetch_end = wb_cyc & wb_stb & (wb_ack | wb_err) & (&line_burst_cnt);
 
 assign wb_adr = {cache_write_addr[14:2], line_burst_cnt};
 
 reg [`LINE_SIZE-1:0] line_collect;
 reg [`CACHE_OFF_W:0] line_burst_cnt;
+reg invalidate_bus_err;
 always @(posedge i_clk) begin
     if (i_rst) begin
         wb_cyc <= 1'b0;
         wb_stb <= 1'b0;
+        invalidate_bus_err <= 1'b0;
     end else if (mem_fetch_end) begin
         line_burst_cnt <= 3'b0;
         wb_cyc <= 1'b0;
         wb_stb <= 1'b0;
-    end else if (wb_cyc & wb_stb & wb_ack) begin
+        invalidate_bus_err <= invalidate_bus_err | wb_err;
+    end else if (wb_cyc & wb_stb & (wb_ack | wb_err)) begin
         line_burst_cnt <= line_burst_cnt + 1'b1;
+        invalidate_bus_err <= invalidate_bus_err | wb_err;
     end else if(cache_miss) begin
         line_burst_cnt <= 3'b0;
         wb_cyc <= 1'b1;
         wb_stb <= 1'b1;
+        invalidate_bus_err <= 1'b0;
     end
 end
 
@@ -138,9 +144,11 @@ always @(posedge i_clk) begin
     end
 end
 
+wire invalidate_bus_err_w = (mem_fetch_end & wb_err) | invalidate_bus_err;
+
 wire [`LINE_SIZE-1:0] pre_assembled_line = {wb_i_dat, line_collect[111:0]};
 wire [`ENTRY_SIZE-1:0] cache_write_entry = {write_tag, pre_assembled_line, 1'b1};
-assign cache_we[0] = mem_fetch_end & ~invalidate_cache_update;
+assign cache_we[0] = mem_fetch_end & ~invalidate_cache_update & ~invalidate_bus_err_w;
 
 always @(posedge i_clk) begin
     case (line_burst_cnt)
@@ -195,7 +203,7 @@ reg [DW-1:0] mem [AS-1:0];
 always @(posedge i_clk) begin
     if (i_rst) begin
         for (integer row = 0; row < AS; row = row+1) begin
-            mem[row][0] = 1'b0;
+            mem[row][0] <= 1'b0;
         end
     end else begin
         if(i_we)
@@ -205,3 +213,13 @@ always @(posedge i_clk) begin
 end
 
 endmodule
+
+`undef TAG_SIZE
+`undef LINE_SIZE
+`undef ENTRY_SIZE
+`undef CACHE_ASSOC
+`undef CACHE_ENTR_N
+`undef CACHE_SETS_N
+`undef CACHE_OFF_W
+`undef CACHE_IDX_WIDTH
+`undef CACHE_IDXES 
