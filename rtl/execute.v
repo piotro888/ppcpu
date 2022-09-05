@@ -70,7 +70,7 @@ assign o_ready = exec_submit | ~instr_valid;
 
 // At IRQ, current instruction (and state update) is invalidated and pc is saved to sr, to
 // continue execution from current instruction. Flush is requested on next cycle
-wire irq = (i_irq & irq_en) | prev_sys;
+wire irq = (i_irq & irq_en) | prev_sys | trap_exception;
 
 always @(posedge i_clk) begin
     if(i_rst) begin
@@ -202,6 +202,15 @@ always @(posedge i_clk) begin
     end
 end
 
+reg trap_exception;
+always @(posedge i_clk) begin
+    if (i_rst) begin
+        trap_exception <= 1'b0;
+    end else begin
+        trap_exception <= trap_flag & exec_submit;
+    end
+end
+
 // Special registers
 `define SREG_PC `RW'b0
 `define SREG_PRIV_CTRL `RW'b1
@@ -229,15 +238,15 @@ always @* begin
             sreg_irq_pc_ie = c_sreg_store;
         end
         `SREG_JTR: begin
-            sreg_out = {15'b0, sreg_jtr_out};
-            sreg_jtr_ie = c_sreg_store;
+            sreg_out = {14'b0, sreg_jtr_out};
+            sreg_jtr_ie = c_sreg_store & sreg_priv_mode;
         end
         `SREG_ALU_FLAGS: begin
             sreg_out = {11'b0, alu_flags_q};
             alu_flags_sreg_ie = c_sreg_store;
         end
         `SREG_IRQ_FLAGS: begin
-            sreg_out = {15'b0, sreg_syscall};
+            sreg_out = {14'b0, sreg_irq_flags_out};
         end
         `SREG_SCRATCH: begin
             sreg_out = sreg_scratch_out;
@@ -256,7 +265,7 @@ end
 // Special registers control
 
 
-wire [`RW-1:0] priv_in = (irq ? (sreg_priv_control_out & `RW'hfffb) : (c_sreg_irt ? (sreg_priv_control_out | `RW'h0004) : sreg_in)); // disable irq flag on interrupt and re-enable on return
+wire [`RW-1:0] priv_in = (irq ? (sreg_priv_control_out & `RW'hfff9) : (c_sreg_irt ? (sreg_priv_control_out | `RW'h0004) : sreg_in)); // disable irq and paging flag on interrupt and re-enable on return
 register #(.RESET_VAL(`RW'b001)) sreg_priv_control (.i_clk(i_clk), .i_rst(i_rst), .i_d(priv_in), .o_d(sreg_priv_control_out),
     .i_ie((((sreg_priv_control_ie & sreg_priv_mode) | c_sreg_irt) & exec_submit) | irq));
 
@@ -265,22 +274,23 @@ assign o_c_data_page = sreg_priv_control_out[1];
 
 register sreg_irq_pc (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_pc_ie ? sreg_in : pc_val), .o_d(sreg_irq_pc_out), .i_ie(irq | (sreg_irq_pc_ie & exec_submit)));
 
-wire sreg_jtr_buff_o, sreg_jtr_out;
+wire [1:0] sreg_jtr_buff_o, sreg_jtr_out;
 wire jtr_jump_en = (sreg_irq_pc_ie | jump_dec_valid | c_sreg_irt) & exec_submit;
 wire jtr_irqh_write = irq;
-wire jtr_buff_in = (irq ? 1'b0 : sreg_in[0]);
-wire jtr_in = (irq ? 1'b0 : sreg_jtr_buff_o);
-register  #(.RESET_VAL(1'b1), .N(1)) sreg_jtr_buff (.i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_buff_in), .o_d(sreg_jtr_buff_o), .i_ie(sreg_jtr_ie | jtr_irqh_write));
-register  #(.RESET_VAL(1'b1), .N(1)) sreg_jtr (.i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_in), .o_d(sreg_jtr_out), .i_ie(jtr_jump_en | jtr_irqh_write));
-assign o_c_instr_page = sreg_jtr_out;
+wire [1:0] jtr_buff_in = (irq ? 2'b00 : sreg_in[1:0]);
+wire [1:0] jtr_in = (irq ? 2'b00 : sreg_jtr_buff_o);
+register  #(.RESET_VAL(2'b01), .N(2)) sreg_jtr_buff (.i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_buff_in), .o_d(sreg_jtr_buff_o), .i_ie(sreg_jtr_ie | jtr_irqh_write));
+register  #(.RESET_VAL(2'b01), .N(2)) sreg_jtr (.i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_in), .o_d(sreg_jtr_out), .i_ie(jtr_jump_en | jtr_irqh_write));
+assign o_c_instr_page = sreg_jtr_out[0];
+wire trap_flag = sreg_jtr_out[1];
 
 register sreg_scratch (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_in), .o_d(sreg_scratch_out), .i_ie(sreg_scratch_ie & exec_submit));
 
-wire sreg_syscall;
-register #(.N(1)) sreg_irq_flags (.i_clk(i_clk), .i_rst(i_rst), .i_d(prev_sys), .o_d(sreg_syscall), .i_ie(irq));
+wire [1:0] sreg_irq_flags_in = {trap_exception, prev_sys}, sreg_irq_flags_out;
+register #(.N(2)) sreg_irq_flags (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_flags_in), .o_d(sreg_irq_flags_out), .i_ie(irq));
 
 wire immu_write = c_sreg_store & exec_submit & (sr_bus_addr >= `RW'h100 && sr_bus_addr < `RW'h100 + 16); // flush after write to mmu is executed
-wire flush_instr_mmu = (immu_write & o_c_instr_page) | ((jtr_in ^ sreg_jtr_out) & (jtr_jump_en | jtr_irqh_write)); // & exec_submit
+wire flush_instr_mmu = (immu_write & o_c_instr_page) | ((jtr_in[0] ^ sreg_jtr_out[0]) & (jtr_jump_en | jtr_irqh_write));
 always @(posedge i_clk)
     o_icache_flush <= flush_instr_mmu & ~i_rst;
 
