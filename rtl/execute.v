@@ -46,7 +46,8 @@ module execute (
     output o_c_instr_page, o_c_data_page,
     output [`RW-1:0] sr_bus_addr, sr_bus_data_o,
     output sr_bus_we,
-    output reg o_icache_flush
+    output reg o_icache_flush,
+    input i_mem_exception
 );
 
 reg next_ready_delayed;
@@ -70,7 +71,7 @@ assign o_ready = exec_submit | ~instr_valid;
 
 // At IRQ, current instruction (and state update) is invalidated and pc is saved to sr, to
 // continue execution from current instruction. Flush is requested on next cycle
-wire irq = (i_irq & irq_en) | prev_sys | trap_exception;
+wire irq = (i_irq & irq_en) | prev_sys | trap_exception | i_mem_exception;
 
 always @(posedge i_clk) begin
     if(i_rst) begin
@@ -211,6 +212,14 @@ always @(posedge i_clk) begin
     end
 end
 
+reg [`RW-1:0] mem_stage_pc;
+always @(posedge i_clk) begin
+    if (i_rst)
+        mem_stage_pc <= `RW'b0;
+    else if (exec_submit)
+        mem_stage_pc <= pc_val;
+end
+
 // Special registers
 `define SREG_PC `RW'b0
 `define SREG_PRIV_CTRL `RW'b1
@@ -246,7 +255,7 @@ always @* begin
             alu_flags_sreg_ie = c_sreg_store;
         end
         `SREG_IRQ_FLAGS: begin
-            sreg_out = {14'b0, sreg_irq_flags_out};
+            sreg_out = {13'b0, sreg_irq_flags_out};
         end
         `SREG_SCRATCH: begin
             sreg_out = sreg_scratch_out;
@@ -272,7 +281,7 @@ register #(.RESET_VAL(`RW'b001)) sreg_priv_control (.i_clk(i_clk), .i_rst(i_rst)
 wire irq_en = sreg_priv_control_out[2], sreg_priv_mode = sreg_priv_control_out[0];
 assign o_c_data_page = sreg_priv_control_out[1];
 
-register sreg_irq_pc (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_pc_ie ? sreg_in : pc_val), .o_d(sreg_irq_pc_out), .i_ie(irq | (sreg_irq_pc_ie & exec_submit)));
+register sreg_irq_pc (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_pc_ie ? sreg_in : (i_mem_exception ? mem_stage_pc : pc_val)), .o_d(sreg_irq_pc_out), .i_ie(irq | (sreg_irq_pc_ie & exec_submit)));
 
 wire [1:0] sreg_jtr_buff_o, sreg_jtr_out;
 wire jtr_jump_en = (sreg_irq_pc_ie | jump_dec_valid | c_sreg_irt) & exec_submit;
@@ -286,8 +295,8 @@ wire trap_flag = sreg_jtr_out[1];
 
 register sreg_scratch (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_in), .o_d(sreg_scratch_out), .i_ie(sreg_scratch_ie & exec_submit));
 
-wire [1:0] sreg_irq_flags_in = {trap_exception, prev_sys}, sreg_irq_flags_out;
-register #(.N(2)) sreg_irq_flags (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_flags_in), .o_d(sreg_irq_flags_out), .i_ie(irq));
+wire [2:0] sreg_irq_flags_in = {i_mem_exception, trap_exception, prev_sys}, sreg_irq_flags_out;
+register #(.N(3)) sreg_irq_flags (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_flags_in), .o_d(sreg_irq_flags_out), .i_ie(irq));
 
 wire immu_write = c_sreg_store & exec_submit & (sr_bus_addr >= `RW'h100 && sr_bus_addr < `RW'h100 + 16); // flush after write to mmu is executed
 wire flush_instr_mmu = (immu_write & o_c_instr_page) | ((jtr_in[0] ^ sreg_jtr_out[0]) & (jtr_jump_en | jtr_irqh_write));

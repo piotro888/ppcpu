@@ -12,6 +12,7 @@ module dcache (
     output reg [`RW-1:0] mem_o_data,
     input [1:0] mem_sel,
     input mem_cache_enable,
+    output mem_exception,
 
     // output interface
     output reg wb_cyc,
@@ -87,9 +88,9 @@ assign mem_ack = (state == `S_CREAD && ~mem_we && cache_ghit) | (mem_fetch_end &
 always @(posedge i_clk) begin
     if (i_rst) begin
         state <= `S_IDLE;
-    end else if (state == `S_IDLE && mem_req && ~mem_cache_enable) begin
+    end else if (state == `S_IDLE && mem_req && ~mem_cache_enable && ~illegal_address) begin
         state <= `S_NOCACHE;
-    end else if (state == `S_IDLE && mem_req) begin
+    end else if (state == `S_IDLE && mem_req && ~illegal_address) begin
         state <= `S_CREAD;
     end else if (state == `S_CREAD && cache_ghit && ~mem_we) begin
         state <= `S_IDLE;
@@ -113,6 +114,11 @@ always @(posedge i_clk) begin
         state <= `S_IDLE;
     end
 end
+
+`define FIRST_PAGE `WB_ADDR_W'h000800
+wire illegal_address = mem_addr < `FIRST_PAGE;
+
+assign mem_exception = (state == `S_IDLE && mem_req && illegal_address);
 
 wire wb_sel_adr_source = (state == `S_MISS_WR) | (state == `S_CREAD && cache_gmiss && entry_dirty);
 
@@ -140,7 +146,7 @@ always @(posedge i_clk) begin
         wb_cyc <= 1'b0;
         wb_stb <= 1'b0;
         transfer_bus_err <= 1'b0;
-    end else if (state == `S_IDLE && mem_req && ~mem_cache_enable) begin
+    end else if (state == `S_IDLE && mem_req && ~mem_cache_enable && ~illegal_address) begin
         wb_cyc <= 1'b1;
         wb_stb <= 1'b1;
         wb_we <= mem_we;
