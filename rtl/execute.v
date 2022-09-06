@@ -228,6 +228,7 @@ end
 `define SREG_ALU_FLAGS `RW'b100
 `define SREG_IRQ_FLAGS `RW'b101
 `define SREG_SCRATCH `RW'b110
+`define SREG_CPUID `RW'b111
 
 reg pc_sreg_ie, sreg_priv_control_ie, sreg_irq_pc_ie, alu_flags_sreg_ie, sreg_jtr_ie, sreg_scratch_ie;
 wire [`RW-1:0] sreg_priv_control_out, sreg_irq_pc_out, sreg_scratch_out;
@@ -255,11 +256,14 @@ always @* begin
             alu_flags_sreg_ie = c_sreg_store;
         end
         `SREG_IRQ_FLAGS: begin
-            sreg_out = {13'b0, sreg_irq_flags_out};
+            sreg_out = {12'b0, sreg_irq_flags_out};
         end
         `SREG_SCRATCH: begin
             sreg_out = sreg_scratch_out;
             sreg_scratch_ie = c_sreg_store;
+        end
+        `SREG_CPUID: begin
+            sreg_out = 16'b1111_0000_0011_0001;
         end
         default:
             sreg_out = 16'b0;
@@ -295,8 +299,8 @@ wire trap_flag = sreg_jtr_out[1];
 
 register sreg_scratch (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_in), .o_d(sreg_scratch_out), .i_ie(sreg_scratch_ie & exec_submit));
 
-wire [2:0] sreg_irq_flags_in = {i_mem_exception, trap_exception, prev_sys}, sreg_irq_flags_out;
-register #(.N(3)) sreg_irq_flags (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_flags_in), .o_d(sreg_irq_flags_out), .i_ie(irq));
+wire [3:0] sreg_irq_flags_in = {i_mem_exception, trap_exception, prev_sys, (i_irq & irq_en)}, sreg_irq_flags_out;
+register #(.N(4)) sreg_irq_flags (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_flags_in), .o_d(sreg_irq_flags_out), .i_ie(irq));
 
 wire immu_write = c_sreg_store & exec_submit & (sr_bus_addr >= `RW'h100 && sr_bus_addr < `RW'h100 + 16); // flush after write to mmu is executed
 wire flush_instr_mmu = (immu_write & o_c_instr_page) | ((jtr_in[0] ^ sreg_jtr_out[0]) & (jtr_jump_en | jtr_irqh_write));
