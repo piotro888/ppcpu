@@ -49,6 +49,7 @@ reg l_we;
 reg [`MAX_BRST_LOG-1:0] burst_end, burst_cnt;
 
 wire xfer_ack = ((cw_ack | cw_err) && wb_cyc && wb_stb);
+wire ignored_addr = wb_adr < `WB_ADDR_W'h002000;
 
 always @(posedge i_clk) begin
     if (i_rst) begin
@@ -58,7 +59,7 @@ always @(posedge i_clk) begin
     end else begin
         case (state) 
             default: begin
-                if (wb_cyc & wb_stb) begin
+                if (wb_cyc & wb_stb & ~ignored_addr) begin
                     state <= `S_HDR_1;
                     cw_io_o <= header_0;
                     cw_dir <= 1'b0;

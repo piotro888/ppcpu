@@ -39,7 +39,8 @@ always @(posedge clk_m) begin
         prev_ack <= (msy_flag_ack |  msy_flag_err);
     end
 end
-wire m_new_req = m_wb_stb & (~prev_stb | prev_ack);
+wire m_new_req = m_wb_stb & (~prev_stb | prev_ack) & ~ignored_addr;
+wire ignored_addr = m_wb_adr < `WB_ADDR_W'h002000;
 
 `define MAX_BURST_LOG 4
 reg [`MAX_BURST_LOG-1:0] m_burst_cnt;

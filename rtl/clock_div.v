@@ -35,8 +35,10 @@ always @(posedge i_clk) begin
         curr_div <= `MAX_DIV_LOG'b010;
         next_div_val <= 1'b0;
     end else begin
-        if(cnt[curr_div] & next_div_val)
+        if(cnt[curr_div] & next_div_val) begin
             curr_div <= next_div_buff;
+            next_div_val <= 1'b0;
+        end
         if (div_we) begin
             next_div_buff <= div;
             next_div_val <= 1'b1;

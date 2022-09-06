@@ -29,7 +29,7 @@ wire [`WB_DATA_W-1:0] u_wb_o_dat;
 wire[`WB_DATA_W-1:0] u_wb_i_dat;
 wire [`WB_ADDR_W-1:0]  u_wb_adr;
 wire u_wb_we;
-wire u_wb_ack;
+wire u_wb_ack, u_wb_ack_cmp;
 wire u_wb_err;
 wire [`WB_SEL_BITS-1:0] u_wb_sel;
 
@@ -61,13 +61,16 @@ upper_core upc (
 
 wire cmp_clk;
 
+`define CLK_DIV_ADDR `WB_ADDR_W'h001001
 clock_div clock_div (
     .i_clk(i_clk),
     .i_rst(s_rst),
     .o_clk(cmp_clk),
-    .div('0),
-    .div_we(1'b0)
+    .div(u_wb_o_dat[3:0]),
+    .div_we(u_wb_cyc & u_wb_stb & u_wb_we & (u_wb_adr == `CLK_DIV_ADDR))
 );
+wire clk_wb_ack = u_wb_cyc & u_wb_stb & u_wb_we & (u_wb_adr == `CLK_DIV_ADDR);
+assign u_wb_ack = u_wb_ack_cmp | clk_wb_ack;
 
 wire c_wb_8_burst, c_wb_4_burst;
 wire c_wb_cyc;
@@ -92,7 +95,7 @@ wb_cross_clk wb_cross_clk (
     .m_wb_i_dat(u_wb_i_dat),
     .m_wb_adr(u_wb_adr),
     .m_wb_we(u_wb_we),
-    .m_wb_ack(u_wb_ack),
+    .m_wb_ack(u_wb_ack_cmp),
     .m_wb_err(u_wb_err),
     .m_wb_sel(u_wb_sel),
     .m_wb_4_burst(u_wb_4_burst),
