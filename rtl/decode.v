@@ -66,6 +66,12 @@ module decode (
 `define OPC_LO8 7'h20
 `define OPC_SD8 7'h21
 `define OPC_SO8 7'h22
+`define OPC_SLI 7'h23
+`define OPC_SRI 7'h24
+`define OPC_SAR 7'h25
+`define OPC_SAI 7'h26
+`define OPC_SEX 7'h27
+
 
 wire [6:0] opcode = i_instr_l[6:0];
 wire [2:0] reg_dst = i_instr_l[9:7];
@@ -355,6 +361,45 @@ always @(*) begin
             c_mem_we = 1'b1;
             c_used_operands = 2'b11;
             c_mem_width = 1'b1;
+        end
+        `OPC_SLI: begin
+            c_alu_mode = `ALU_MODE_SHL;
+            c_l_reg_sel = reg_st;
+            c_r_bus_imm = 1'b1;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_alu_flags_ie = 1'b1;
+            c_used_operands = 2'b01;
+        end
+        `OPC_SRI: begin
+            c_alu_mode = `ALU_MODE_SHR;
+            c_l_reg_sel = reg_st;
+            c_r_bus_imm = 1'b1;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_alu_flags_ie = 1'b1;
+            c_used_operands = 2'b01;
+        end
+        `OPC_SAR: begin
+            c_alu_mode = `ALU_MODE_ASHR;
+            c_l_reg_sel = reg_st;
+            c_r_reg_sel = reg_nd;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_alu_flags_ie = 1'b1;
+            c_used_operands = 2'b11;
+        end
+        `OPC_SAI: begin
+            c_alu_mode = `ALU_MODE_ASHR;
+            c_l_reg_sel = reg_st;
+            c_r_bus_imm = 1'b1;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_alu_flags_ie = 1'b1;
+            c_used_operands = 2'b01;
+        end
+        `OPC_SEX: begin
+            c_alu_mode = `ALU_MODE_SEXT;
+            c_l_reg_sel = reg_st;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_alu_flags_ie = 1'b1;
+            c_used_operands = 2'b01;
         end
         default: begin
         end

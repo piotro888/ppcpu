@@ -37,6 +37,10 @@ always @* begin
             outc = {1'b0, i_l * i_r};
         `ALU_MODE_DIV: // temporary
             outc = {1'b0, i_l / i_r};
+        `ALU_MODE_ASHR:
+            outc = {1'b0, (i_l >> i_r) | ({`RW{i_l[`RW-1]}} << (`RW-i_r))};
+        `ALU_MODE_SEXT:
+            outc = {1'b0, {8{i_l[7]}}, i_l[7:0]};
     endcase
 
     o_flags[`ALU_FLAG_Z] = ~(|outc[`RW-1:0]);
