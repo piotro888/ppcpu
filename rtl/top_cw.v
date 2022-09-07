@@ -16,7 +16,9 @@ module top_cw (
     input cw_ack,
     input cw_err,
     output cw_clk,
-    input i_irq
+    input i_irq,
+
+    input ic_split_clock
 );
 
 wire u_wb_8_burst, u_wb_4_burst;
@@ -30,7 +32,8 @@ wire u_wb_ack, u_wb_ack_cmp, u_wb_ack_clk;
 wire u_wb_err;
 wire [`WB_SEL_BITS-1:0] u_wb_sel;
 
-assign u_wb_ack = u_wb_ack_cmp | u_wb_ack_clk;
+wire u_wb_ack_mxed;
+assign u_wb_ack = u_wb_ack_mxed | u_wb_ack_clk;
 
 wire [`RW-1:0] ignore_dbg_r0, ignore_dbg_pc;
 
@@ -66,16 +69,16 @@ clock_div clock_div (
 );
 assign u_wb_ack_clk = u_wb_cyc & u_wb_stb & u_wb_we & (u_wb_adr == `CLK_DIV_ADDR);
 
-wire c_wb_8_burst, c_wb_4_burst;
-wire c_wb_cyc;
-wire c_wb_stb;
-wire [`WB_DATA_W-1:0] c_wb_o_dat;
-wire[`WB_DATA_W-1:0] c_wb_i_dat;
-wire [`WB_ADDR_W-1:0]  c_wb_adr;
-wire c_wb_we;
-wire c_wb_ack;
-wire c_wb_err;
-wire [`WB_SEL_BITS-1:0] c_wb_sel;
+wire cc_wb_8_burst, cc_wb_4_burst;
+wire cc_wb_cyc;
+wire cc_wb_stb;
+wire [`WB_DATA_W-1:0] cc_wb_o_dat;
+wire[`WB_DATA_W-1:0] cc_wb_i_dat;
+wire [`WB_ADDR_W-1:0] cc_wb_adr;
+wire cc_wb_we;
+wire cc_wb_ack;
+wire cc_wb_err;
+wire [`WB_SEL_BITS-1:0] cc_wb_sel;
 
 wb_cross_clk wb_ucross_clk (
     .clk_m(i_clk),
@@ -86,30 +89,47 @@ wb_cross_clk wb_ucross_clk (
     .m_wb_cyc(u_wb_cyc),
     .m_wb_stb(u_wb_stb),
     .m_wb_o_dat(u_wb_o_dat),
-    .m_wb_i_dat(u_wb_i_dat),
+    .m_wb_i_dat(u_wb_i_dat_cc),
     .m_wb_adr(u_wb_adr),
     .m_wb_we(u_wb_we),
-    .m_wb_ack(u_wb_ack_cmp),
-    .m_wb_err(u_wb_err),
+    .m_wb_ack(u_wb_ack_cc),
+    .m_wb_err(u_wb_err_cc),
     .m_wb_sel(u_wb_sel),
     .m_wb_4_burst(u_wb_4_burst),
     .m_wb_8_burst(u_wb_8_burst),
 
-    .s_wb_cyc(c_wb_cyc),
-    .s_wb_stb(c_wb_stb),
-    .s_wb_o_dat(c_wb_o_dat),
-    .s_wb_i_dat(c_wb_i_dat),
-    .s_wb_adr(c_wb_adr),
-    .s_wb_we(c_wb_we),
-    .s_wb_ack(c_wb_ack),
-    .s_wb_err(c_wb_err),
-    .s_wb_sel(c_wb_sel),
-    .s_wb_4_burst(c_wb_4_burst),
-    .s_wb_8_burst(c_wb_8_burst)
+    .s_wb_cyc(cc_wb_cyc),
+    .s_wb_stb(cc_wb_stb),
+    .s_wb_o_dat(cc_wb_o_dat),
+    .s_wb_i_dat(c_wb_i_dat_cmp),
+    .s_wb_adr(cc_wb_adr),
+    .s_wb_we(cc_wb_we),
+    .s_wb_ack(c_wb_ack_cmp),
+    .s_wb_err(c_wb_err_cmp),
+    .s_wb_sel(cc_wb_sel),
+    .s_wb_4_burst(cc_wb_4_burst),
+    .s_wb_8_burst(cc_wb_8_burst)
 );
 
+// Wishbone mux to skip multiple clocks
+wire c_wb_8_burst = (ic_split_clock ? cc_wb_8_burst : u_wb_8_burst);
+wire c_wb_4_burst = (ic_split_clock ? cc_wb_4_burst : u_wb_4_burst);
+wire c_wb_cyc = (ic_split_clock ? cc_wb_cyc : u_wb_cyc);
+wire c_wb_stb = (ic_split_clock ? cc_wb_stb : u_wb_stb);
+wire [`WB_DATA_W-1:0] c_wb_o_dat = (ic_split_clock ? cc_wb_o_dat : u_wb_o_dat);
+wire [`WB_ADDR_W-1:0]  c_wb_adr = (ic_split_clock ? cc_wb_adr : u_wb_adr);
+wire c_wb_we = (ic_split_clock ? cc_wb_we : u_wb_we);
+wire [`WB_SEL_BITS-1:0] c_wb_sel = (ic_split_clock ? cc_wb_sel : u_wb_sel);
+
+wire [`WB_DATA_W-1:0] c_wb_i_dat_cmp, u_wb_i_dat_cc;
+wire c_wb_ack_cmp, c_wb_err_cmp, u_wb_ack_cc, u_wb_err_cc;
+
+assign u_wb_ack_mxed = (ic_split_clock ? u_wb_ack_cc : c_wb_ack_cmp);
+assign u_wb_err = (ic_split_clock ? u_wb_err_cc : c_wb_err_cmp);
+assign u_wb_i_dat = (ic_split_clock ? u_wb_i_dat_cc : c_wb_i_dat_cmp);
+
 wb_compressor wb_compressor(
-    .i_clk(cmp_clk),
+    .i_clk(cw_clk),
     .i_rst(cw_rst),
 
     .cw_io_i(cw_io_i),
@@ -122,19 +142,20 @@ wb_compressor wb_compressor(
     .wb_cyc(c_wb_cyc),
     .wb_stb(c_wb_stb),
     .wb_o_dat(c_wb_o_dat),
-    .wb_i_dat(c_wb_i_dat),
+    .wb_i_dat(c_wb_i_dat_cmp),
     .wb_adr(c_wb_adr),
     .wb_we(c_wb_we),
-    .wb_ack(c_wb_ack),
-    .wb_err(c_wb_err),
+    .wb_ack(c_wb_ack_cmp),
+    .wb_err(c_wb_err_cmp),
     .wb_sel(c_wb_sel),
 
     .wb_4_burst(c_wb_4_burst),
     .wb_8_burst(c_wb_8_burst)
 );
 
-assign cw_clk = cmp_clk;
-wire cw_rst, s_rst;
+assign cw_clk = (ic_split_clock ? cmp_clk : i_clk);
+assign cw_rst = (ic_split_clock ? cw_rst_z : s_rst);
+wire cw_rst, s_rst, cw_rst_z;
 
 reset_sync rst_clk_sync (
     .i_clk(i_clk),
@@ -145,7 +166,7 @@ reset_sync rst_clk_sync (
 reset_sync rst_cw_sync (
     .i_clk(cw_clk),
     .i_rst(i_rst),
-    .o_rst(cw_rst)
+    .o_rst(cw_rst_z)
 );
 
 wire irq_s = irq_s_ff[1];
@@ -161,6 +182,5 @@ endmodule
 `undef SW
 `include "wishbone/wb_compressor.v"
 `undef SW
-`include "wishbone/wb_decomp.v"
 `include "wishbone/wb_mclock.v"
 `include "clock_div.v"
