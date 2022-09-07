@@ -57,7 +57,7 @@ reg [`SW-1:0] state;
 
 wire [`ENTRY_SIZE-1:0] cache_mem_in;
 wire [`ENTRY_SIZE-1:0] cache_out [`CACHE_ASSOC-1:0];
-wire [`CACHE_ASSOC-1:0] cache_we;
+reg [`CACHE_ASSOC-1:0] cache_we;
 wire [`CACHE_ASSOC-1:0] cache_hit;
 
 wire [`CACHE_IDX_WIDTH-1:0] cache_idx = mem_addr[7:2];
@@ -96,9 +96,9 @@ always @(posedge i_clk) begin
         state <= `S_IDLE;
     end else if (state == `S_CREAD && cache_ghit && mem_we) begin
         state <= `S_RQ_WR;
-    end else if (state == `S_CREAD && cache_gmiss && ~entry_dirty) begin
+    end else if (state == `S_CREAD && cache_gmiss && ~all_entries_dirty) begin
         state <= `S_MISS_RD;
-    end else if (state == `S_CREAD && cache_gmiss && entry_dirty) begin
+    end else if (state == `S_CREAD && cache_gmiss && all_entries_dirty) begin
         state <= `S_MISS_WR;
     end else if (state == `S_MISS_RD && mem_fetch_end && ~mem_we) begin
         state <= `S_IDLE;
@@ -120,18 +120,16 @@ wire illegal_address = mem_addr < `FIRST_PAGE;
 
 assign mem_exception = (state == `S_IDLE && mem_req && illegal_address);
 
-wire wb_sel_adr_source = (state == `S_MISS_WR) | (state == `S_CREAD && cache_gmiss && entry_dirty);
+wire wb_sel_adr_source = (state == `S_MISS_WR) | (state == `S_CREAD && cache_gmiss && all_entries_dirty);
 
 assign wb_adr = (wb_sel_adr_source ? {old_entry_addr[`WB_ADDR_W-1:2], line_burst_cnt} : {mem_addr[`WB_ADDR_W-1:2], line_burst_cnt});
 assign wb_sel = (mem_cache_enable ? 2'b11 : mem_sel);
 assign wb_4_burst = mem_cache_enable;
 
-wire [`CACHE_ASSOC_W-1:0] write_sel_idx = 2'b0;
-
-assign cache_we[0] = (mem_fetch_end & ~transfer_bus_err_w) | write_to_cache;
+wire cache_we_en = (mem_fetch_end & ~transfer_bus_err_w) | write_to_cache;
 assign cache_mem_in = (write_to_cache ? cache_update_entry : {cache_compare_tag, pre_assembled_line, 2'b01});
 
-wire entry_dirty = &cache_out[write_sel_idx][`DIRTY_BIT:`VALID_BIT];
+wire all_entries_dirty = (&cache_out[0][`DIRTY_BIT:`VALID_BIT]) & (&cache_out[1][`DIRTY_BIT:`VALID_BIT]) & (&cache_out[2][`DIRTY_BIT:`VALID_BIT]) & (&cache_out[3][`DIRTY_BIT:`VALID_BIT]);
 wire [`WB_ADDR_W-1:0] old_entry_addr = {write_source_entry[`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE], mem_addr[`CACHE_OFF_W+`CACHE_IDX_WIDTH-1:0]};
 
 reg [`LINE_SIZE-1:0] line_collect;
@@ -156,7 +154,7 @@ always @(posedge i_clk) begin
         line_burst_cnt <= 2'b0;
         wb_cyc <= 1'b1;
         wb_stb <= 1'b1;
-        wb_we <= entry_dirty & ~mem_op_end;
+        wb_we <= all_entries_dirty & ~mem_op_end;
         transfer_bus_err <= transfer_bus_err & ~cache_gmiss; // clear error only on new request. Don't update cache if first write failed
     end else if (mem_op_end || (state == `S_NOCACHE && wb_cyc & wb_stb & (wb_ack | wb_err))) begin
         line_burst_cnt <= 2'b0;
@@ -202,7 +200,7 @@ always @* begin
     end
 end
 
-wire [`ENTRY_SIZE-1:0] write_source_entry = cache_out[write_sel_idx];
+wire [`ENTRY_SIZE-1:0] write_source_entry = cache_out[tx_cache_sel];
 always @* begin
     if (mem_cache_enable) begin
         case (line_burst_cnt)
@@ -232,6 +230,35 @@ always @* begin
         4'b1101: cache_update_entry = {write_source_entry[`ENTRY_SIZE-1:58], mem_i_data[7:0], write_source_entry[49:2], 2'b11};
         4'b1110: cache_update_entry = {write_source_entry[`ENTRY_SIZE-1:66], mem_i_data[15:8], write_source_entry[57:2], 2'b11};
     endcase
+end
+
+reg [1:0] cache_sel;
+reg [1:0] tx_cache_sel, prev_cache_sel;
+always @* begin
+    if (~cache_out[0][`VALID_BIT]) cache_sel = 2'b0;
+    else if (~cache_out[1][`VALID_BIT]) cache_sel = 2'b1;
+    else if (~cache_out[2][`VALID_BIT]) cache_sel = 2'b10;
+    else if (~cache_out[3][`VALID_BIT]) cache_sel = 2'b11;
+    else if (~cache_out[0][`DIRTY_BIT]) cache_sel = 2'b0;
+    else if (~cache_out[1][`DIRTY_BIT]) cache_sel = 2'b1;
+    else if (~cache_out[2][`DIRTY_BIT]) cache_sel = 2'b10;
+    else if (~cache_out[3][`DIRTY_BIT]) cache_sel = 2'b11;
+    else cache_sel = prev_cache_sel + 1'b1;
+end
+
+always @(posedge i_clk) begin
+    if (state == `S_CREAD && cache_gmiss && ~i_rst) begin
+        tx_cache_sel <= cache_sel;
+        prev_cache_sel <= tx_cache_sel;
+    end else if (state == `S_CREAD && cache_ghit && mem_we && ~i_rst) begin
+        tx_cache_sel <= (|(cache_hit&4'b1) ? 2'b0 : (|(cache_hit&4'b10) ? 2'b1 : (|(cache_hit&4'b100) ? 2'b10 : 2'b11)));
+        prev_cache_sel <= tx_cache_sel;
+    end
+end
+
+always @* begin
+    cache_we[3:0] = 4'b0;
+    cache_we[tx_cache_sel] = cache_we_en;
 end
 
 endmodule

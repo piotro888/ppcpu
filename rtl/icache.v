@@ -46,7 +46,7 @@ wire [`CACHE_OFF_W-1:0] write_off = cache_write_addr[1:0];
 
 wire [`ENTRY_SIZE-1:0] cache_mem_in = cache_write_entry;
 wire [`ENTRY_SIZE-1:0] cache_out [`CACHE_ASSOC-1:0];
-wire [`CACHE_ASSOC-1:0] cache_we;
+reg [`CACHE_ASSOC-1:0] cache_we;
 wire [`CACHE_ASSOC-1:0] cache_hit;
 
 reg [`RW-1:0] cache_read_addr, cache_write_addr;
@@ -148,7 +148,12 @@ wire invalidate_bus_err_w = (mem_fetch_end & wb_err) | invalidate_bus_err;
 
 wire [`LINE_SIZE-1:0] pre_assembled_line = {wb_i_dat, line_collect[111:0]};
 wire [`ENTRY_SIZE-1:0] cache_write_entry = {write_tag, pre_assembled_line, 1'b1};
-assign cache_we[0] = mem_fetch_end & ~invalidate_cache_update & ~invalidate_bus_err_w;
+wire cache_we_en = mem_fetch_end & ~invalidate_cache_update & ~invalidate_bus_err_w;
+always @* begin
+    cache_we[3:0] = 4'b0;
+    cache_we[tx_cache_sel] = cache_we_en;
+end
+
 
 always @(posedge i_clk) begin
     case (line_burst_cnt)
@@ -184,6 +189,28 @@ always @* begin
         2'b10: mem_data = entry_out[96:65];
         2'b11: mem_data = entry_out[128:97];
     endcase
+end
+
+reg [1:0] cache_sel;
+reg [1:0] tx_cache_sel, prev_cache_sel;
+always @* begin
+    if (~cache_out[0][0])
+        cache_sel = 2'b0;
+    else if (~cache_out[1][0])
+        cache_sel = 2'b1;
+    else if (~cache_out[2][0])
+        cache_sel = 2'b10;
+    else if (~cache_out[3][0])
+        cache_sel = 2'b11;
+    else
+        cache_sel = prev_cache_sel + 2'b1;
+end
+
+always @(posedge i_clk) begin
+    if (cache_miss & ~i_rst) begin
+        tx_cache_sel <= cache_sel;
+        prev_cache_sel <= tx_cache_sel;
+    end
 end
 
 endmodule
