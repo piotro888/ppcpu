@@ -33,7 +33,7 @@ wire u_wb_ack, u_wb_ack_cmp;
 wire u_wb_err;
 wire [`WB_SEL_BITS-1:0] u_wb_sel;
 
-wire [`RW-1:0] cw_io;
+wire [`RW-1:0] cw_io_i, cw_io_o;
 wire cw_req;
 wire cw_dir;
 wire cw_ack;
@@ -118,7 +118,8 @@ wb_compressor wb_compressor(
     .i_clk(cmp_clk),
     .i_rst(cw_rst),
 
-    .cw_io(cw_io),
+    .cw_io_i(cw_io_i),
+    .cw_io_o(cw_io_o),
     .cw_req(cw_req),
     .cw_dir(cw_dir),
     .cw_ack(cw_ack),
@@ -142,7 +143,8 @@ wb_decomp wb_decomp (
     .i_clk(cmp_clk),
     .i_rst(cw_rst),
 
-    .cw_io(cw_io),
+    .cw_io_i(cw_io_o),
+    .cw_io_o(cw_io_i),
     .cw_req(cw_req),
     .cw_dir(cw_dir),
     .cw_ack(cw_ack),

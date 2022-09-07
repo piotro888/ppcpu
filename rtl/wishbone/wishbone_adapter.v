@@ -1,7 +1,6 @@
 `include "config.v"
 
 `define WB_DATA_W 16 
-`define WB_ADDR_W 24
 `define WB_SEL_BITS 2
 
 module wishbone_adapter (

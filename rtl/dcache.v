@@ -18,7 +18,7 @@ module dcache (
     output reg wb_cyc,
     output reg wb_stb,
     input [`RW-1:0] wb_i_dat,
-    output [`RW-1:0] wb_o_dat,
+    output reg [`RW-1:0] wb_o_dat,
     output [`WB_ADDR_W-1:0]  wb_adr,
     output reg wb_we,
     output [1:0] wb_sel,
@@ -168,7 +168,6 @@ always @(posedge i_clk) begin
     end
 end
 
-wire [`ENTRY_SIZE-1:0] write_source_entry;
 always @(posedge i_clk) begin
     case (line_burst_cnt)
         default: line_collect[15:0] <= wb_i_dat;

@@ -6,7 +6,7 @@ module wb_decomp (
 
     output reg wb_cyc,
     output reg wb_stb,
-    output reg [`WB_ADDR_W-1:0] wb_adr,
+    output [`WB_ADDR_W-1:0] wb_adr,
     output reg [`RW-1:0] wb_o_dat,
     input [`RW-1:0] wb_i_dat,
     output reg wb_we,
@@ -14,15 +14,13 @@ module wb_decomp (
     input wb_ack,
     input wb_err,
 
-    inout [`RW-1:0] cw_io,
+    input [`RW-1:0] cw_io_i,
+    output reg [`RW-1:0] cw_io_o,
     input cw_req,
     input cw_dir,
-    output cw_ack,
-    output cw_err
+    output reg cw_ack,
+    output reg cw_err
 );
-reg [`RW-1:0] cw_io_o;
-assign cw_io = (~cw_dir ? `RW'bzzzzzzzzzzzzzzzz : cw_io_o);
-wire [`RW-1:0] cw_io_i = cw_io;
 
 `define SW 4
 `define S_IDLE `SW'b0
@@ -61,7 +59,7 @@ always @(posedge i_clk) begin
                     l_wb_adr[`WB_ADDR_W-1:`RW] <= cw_io_i[`RW-1:8];
                     wb_we <= cw_io_i[3];
                     wb_sel <= cw_io_i[1:0];
-                    burst_end <= (~(|cw_io[7:4]) ? 3'd0 : (cw_io[4] ? 3'd7 : 3'd3));
+                    burst_end <= (~(|cw_io_i[7:4]) ? 3'd0 : (cw_io_i[4] ? 3'd7 : 3'd3));
                     burst_cnt <= `MAX_BRST_LOG'b0;
                     cw_ack <= 1'b1;
                 end
@@ -100,7 +98,7 @@ always @(posedge i_clk) begin
             `S_DATA_W: begin
                 if (~wb_stb & cw_req) begin // wait for write burst new data
                     wb_stb <= 1'b1;
-                    wb_o_dat <= cw_io;
+                    wb_o_dat <= cw_io_i;
                 end
 
                 cw_ack <= 1'b0;

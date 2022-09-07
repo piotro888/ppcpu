@@ -9,7 +9,8 @@ module top_cw (
     input wire i_clk,
     input wire i_rst,
 
-    inout reg [`RW-1:0] cw_io,
+    input [`RW-1:0] cw_io_i,
+    output [`RW-1:0] cw_io_o,
     output cw_req,
     output cw_dir,
     input cw_ack,
@@ -63,7 +64,7 @@ clock_div clock_div (
     .div(u_wb_o_dat[3:0]),
     .div_we(u_wb_cyc & u_wb_stb & u_wb_we & (u_wb_adr == `CLK_DIV_ADDR))
 );
-wire u_wb_ack_clk= u_wb_cyc & u_wb_stb & u_wb_we & (u_wb_adr == `CLK_DIV_ADDR);
+assign u_wb_ack_clk = u_wb_cyc & u_wb_stb & u_wb_we & (u_wb_adr == `CLK_DIV_ADDR);
 
 wire c_wb_8_burst, c_wb_4_burst;
 wire c_wb_cyc;
@@ -76,7 +77,7 @@ wire c_wb_ack;
 wire c_wb_err;
 wire [`WB_SEL_BITS-1:0] c_wb_sel;
 
-wb_cross_clk wb_cross_clk (
+wb_cross_clk wb_ucross_clk (
     .clk_m(i_clk),
     .clk_s(cmp_clk),
     .m_rst(s_rst),
@@ -111,7 +112,8 @@ wb_compressor wb_compressor(
     .i_clk(cmp_clk),
     .i_rst(cw_rst),
 
-    .cw_io(cw_io),
+    .cw_io_i(cw_io_i),
+    .cw_io_o(cw_io_o),
     .cw_req(cw_req),
     .cw_dir(cw_dir),
     .cw_ack(cw_ack),

@@ -12,19 +12,17 @@ module wb_compressor (
     input wb_we,
     input [1:0] wb_sel,
     input wb_8_burst, wb_4_burst,
-    output wb_ack,
-    output wb_err,
+    output reg wb_ack,
+    output reg wb_err,
 
-    inout reg [`RW-1:0] cw_io,
-    output cw_req,
-    output cw_dir,
+    output reg [`RW-1:0] cw_io_o,
+    input [`RW-1:0] cw_io_i,
+    output reg cw_req,
+    output reg cw_dir,
     input cw_ack,
     input cw_err
 );
 
-reg [`RW-1:0] cw_io_o;
-assign cw_io = (cw_dir ? `RW'bzzzzzzzzzzzzzzzz : cw_io_o);
-wire [`RW-1:0] cw_io_i = cw_io;
 
 `define SW 4
 `define S_IDLE `SW'b0

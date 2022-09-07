@@ -10,11 +10,11 @@ module immu (
     input [`PC_ADDR_W-1:0] i_addr,
     output [`OUT_ADDR_W-1:0] o_addr,
 
-    wire [`RW-1:0] i_sr_addr,
-    wire [`RW-1:0] i_sr_data,
-    wire i_sr_we,
+    input [`RW-1:0] i_sr_addr,
+    input [`RW-1:0] i_sr_data,
+    input i_sr_we,
 
-    wire c_pag_en
+    input c_pag_en
 );
 
 `define OFF_W 12
@@ -50,3 +50,10 @@ wire [`OUT_ADDR_W-1:0] page_enable_address = {page_res, page_off};
 assign o_addr = c_pag_en ? page_enable_address : page_disable_address;
 
 endmodule
+
+`undef OFF_W
+`undef PAGE_IDX_W
+`undef PAGE_ENTRIES
+`undef PAGE_RES_SIZE
+`undef SR_ADDR_OFF
+`undef PAGE_DEFAULT_PREFIX

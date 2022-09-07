@@ -11,11 +11,11 @@ module dmmu (
     output [`OUT_ADDR_W-1:0] o_addr,
     output o_cacheable,
 
-    wire [`RW-1:0] i_sr_addr,
-    wire [`RW-1:0] i_sr_data,
-    wire i_sr_we,
+    input [`RW-1:0] i_sr_addr,
+    input [`RW-1:0] i_sr_data,
+    input i_sr_we,
 
-    wire c_pag_en
+    input c_pag_en
 );
 
 `define OFF_W 11
