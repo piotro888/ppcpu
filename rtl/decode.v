@@ -26,7 +26,9 @@ module decode (
     output reg [`JUMP_CODE_W-1:0] oc_jump_cond_code,
     output reg oc_mem_access, oc_mem_we, oc_mem_width,
     output reg [1:0] oc_used_operands,
-    output reg oc_sreg_load, oc_sreg_store, oc_sreg_jal_over, oc_sreg_irt, oc_sys
+    output reg oc_sreg_load, oc_sreg_store, oc_sreg_jal_over, oc_sreg_irt, oc_sys,
+
+    output dbg_out
 );
 
 // COMBINATIONAL INSTRUCTION DECODER
@@ -460,5 +462,6 @@ always @(posedge i_clk) begin
     end
 end
 
+assign dbg_out = o_ready;
 
 endmodule

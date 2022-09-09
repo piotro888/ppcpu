@@ -18,9 +18,11 @@ module top_cw (
     output cw_clk,
     input i_irq,
 
-    input ic_split_clock
+    output [61+16:0] dbg_out,
+    input [4:0] dbg_in
 );
 
+wire ic_split_clock = dbg_in[4];
 wire u_wb_8_burst, u_wb_4_burst;
 wire u_wb_cyc;
 wire u_wb_stb;
@@ -35,7 +37,7 @@ wire [`WB_SEL_BITS-1:0] u_wb_sel;
 wire u_wb_ack_mxed;
 assign u_wb_ack = u_wb_ack_mxed | u_wb_ack_clk;
 
-wire [`RW-1:0] ignore_dbg_r0, ignore_dbg_pc;
+wire [`RW-1:0] dbg_r0, ignore_dbg_pc;
 
 upper_core upc (
     .i_clk(i_clk),
@@ -51,11 +53,16 @@ upper_core upc (
     .wb_sel(u_wb_sel),
     .i_irq(irq_s),
     .wb_rty(1'b0),
-    .dbg_r0(ignore_dbg_r0),
+    .dbg_r0(dbg_r0),
     .dbg_pc(ignore_dbg_pc),
     .wb_4_burst(u_wb_4_burst),
-    .wb_8_burst(u_wb_8_burst)
+    .wb_8_burst(u_wb_8_burst),
+
+    .dbg_in(dbg_in[3:0]),
+    .dbg_out(dbg_out[61:0])
 );
+
+assign dbg_out[77:62] = dbg_r0;
 
 wire cmp_clk;
 

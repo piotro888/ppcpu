@@ -1,6 +1,11 @@
 `include "config.v"
 
 module dcache (
+`ifdef USE_POWER_PINS
+    inout vccd1,	// User area 1 1.8V supply
+    inout vssd1,	// User area 1 digital ground
+`endif
+
     input i_clk,
     input i_rst,
 
@@ -34,8 +39,8 @@ module dcache (
 `define LINE_SIZE 64
 // 16b tag + 64b line + 2b valid dirty
 `define ENTRY_SIZE 82
-`define CACHE_ASSOC 4
-`define CACHE_ASSOC_W 2
+`define CACHE_ASSOC 2
+`define CACHE_ASSOC_W 1
 `define CACHE_ENTR_N 64
 `define CACHE_OFF_W 2
 
@@ -64,15 +69,21 @@ wire [`CACHE_IDX_WIDTH-1:0] cache_idx = mem_addr[7:2];
 wire [`CACHE_OFF_W-1:0] cache_offset = mem_addr[1:0];
 wire [`TAG_SIZE-1:0] cache_compare_tag = mem_addr[`WB_ADDR_W-1:8];
 
-genvar i;
-generate
-    for (i=0; i<`CACHE_ASSOC; i=i+1) begin : cache_mem
-        dcache_mem #(.AW(`CACHE_IDX_WIDTH), .AS(`CACHE_IDXES), .DW(`ENTRY_SIZE)) mem (
-            .i_clk(i_clk), .i_rst(i_rst), .i_addr(cache_idx), .i_data(cache_mem_in),
-            .o_data(cache_out[i]), .i_we(cache_we[i]));
-        assign cache_hit[i] = (cache_out[i][`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE] == cache_compare_tag) && cache_out[i][`VALID_BIT]; 
-    end
-endgenerate
+dcache_ram mem_set_0 (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_addr(cache_idx), .i_data(cache_mem_in),
+    .o_data(cache_out[0]), .i_we(cache_we[0]));
+dcache_ram mem_set_1 (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_addr(cache_idx), .i_data(cache_mem_in),
+    .o_data(cache_out[1]), .i_we(cache_we[1]));
+
+assign cache_hit[0] = (cache_out[0][`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE] == cache_compare_tag) && cache_out[0][`VALID_BIT]; 
+assign cache_hit[1] = (cache_out[1][`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE] == cache_compare_tag) && cache_out[1][`VALID_BIT]; 
 
 wire cache_ghit = (state == `S_CREAD) && (|cache_hit);
 wire cache_gmiss = (state == `S_CREAD) && ~(|cache_hit);
@@ -129,7 +140,7 @@ assign wb_4_burst = mem_cache_enable;
 wire cache_we_en = (mem_fetch_end & ~transfer_bus_err_w) | write_to_cache;
 assign cache_mem_in = (write_to_cache ? cache_update_entry : {cache_compare_tag, pre_assembled_line, 2'b01});
 
-wire all_entries_dirty = (&cache_out[0][`DIRTY_BIT:`VALID_BIT]) & (&cache_out[1][`DIRTY_BIT:`VALID_BIT]) & (&cache_out[2][`DIRTY_BIT:`VALID_BIT]) & (&cache_out[3][`DIRTY_BIT:`VALID_BIT]);
+wire all_entries_dirty = (&cache_out[0][`DIRTY_BIT:`VALID_BIT]) & (&cache_out[1][`DIRTY_BIT:`VALID_BIT]);
 wire [`WB_ADDR_W-1:0] old_entry_addr = {write_source_entry[`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE], mem_addr[`CACHE_OFF_W+`CACHE_IDX_WIDTH-1:0]};
 
 reg [`LINE_SIZE-1:0] line_collect;
@@ -179,9 +190,7 @@ reg [`ENTRY_SIZE-1:0] cache_hit_entry;
 always @* begin
     case (cache_hit)
         default: cache_hit_entry = cache_out[0];
-        4'b0010: cache_hit_entry = cache_out[1];
-        4'b0100: cache_hit_entry = cache_out[2];
-        4'b1000: cache_hit_entry = cache_out[3];
+        2'b10: cache_hit_entry = cache_out[1];
     endcase
 end
 
@@ -232,17 +241,13 @@ always @* begin
     endcase
 end
 
-reg [1:0] cache_sel;
-reg [1:0] tx_cache_sel, prev_cache_sel;
+reg cache_sel;
+reg tx_cache_sel, prev_cache_sel;
 always @* begin
-    if (~cache_out[0][`VALID_BIT]) cache_sel = 2'b0;
-    else if (~cache_out[1][`VALID_BIT]) cache_sel = 2'b1;
-    else if (~cache_out[2][`VALID_BIT]) cache_sel = 2'b10;
-    else if (~cache_out[3][`VALID_BIT]) cache_sel = 2'b11;
-    else if (~cache_out[0][`DIRTY_BIT]) cache_sel = 2'b0;
-    else if (~cache_out[1][`DIRTY_BIT]) cache_sel = 2'b1;
-    else if (~cache_out[2][`DIRTY_BIT]) cache_sel = 2'b10;
-    else if (~cache_out[3][`DIRTY_BIT]) cache_sel = 2'b11;
+    if (~cache_out[0][`VALID_BIT]) cache_sel = 1'b0;
+    else if (~cache_out[1][`VALID_BIT]) cache_sel = 1'b1;
+    else if (~cache_out[0][`DIRTY_BIT]) cache_sel = 1'b0;
+    else if (~cache_out[1][`DIRTY_BIT]) cache_sel = 1'b1;
     else cache_sel = prev_cache_sel + 1'b1;
 end
 
@@ -251,40 +256,16 @@ always @(posedge i_clk) begin
         tx_cache_sel <= cache_sel;
         prev_cache_sel <= tx_cache_sel;
     end else if (state == `S_CREAD && cache_ghit && mem_we && ~i_rst) begin
-        tx_cache_sel <= (|(cache_hit&4'b1) ? 2'b0 : (|(cache_hit&4'b10) ? 2'b1 : (|(cache_hit&4'b100) ? 2'b10 : 2'b11)));
+        tx_cache_sel <= (|(cache_hit&2'b1) ? 1'b0 : 1'b1);
         prev_cache_sel <= tx_cache_sel;
     end
 end
 
 always @* begin
-    cache_we[3:0] = 4'b0;
+    cache_we[1:0] = 2'b0;
     cache_we[tx_cache_sel] = cache_we_en;
 end
 
 endmodule
 
-module dcache_mem #(parameter AW = 2, parameter AS = 4, parameter DW = 16)(
-    input i_clk,
-    input i_rst,
-
-    input [AW-1:0] i_addr,
-    input [DW-1:0] i_data,
-    output reg [DW-1:0] o_data,
-    input i_we
-);
-
-reg [DW-1:0] mem [AS-1:0];
-
-always @(posedge i_clk) begin
-    if (i_rst) begin
-        for (integer row = 0; row < AS; row = row+1) begin
-            mem[row][`DIRTY_BIT:`VALID_BIT] <= 2'b00;
-        end
-    end else begin
-        if(i_we)
-            mem[i_addr] <= i_data;
-        o_data <= mem[i_addr];
-    end
-end
-
-endmodule
+`include "dcache_ram.v"

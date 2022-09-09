@@ -25,7 +25,9 @@ module memwb (
     input i_mem_ack,
     input [`RW-1:0] i_mem_data,
     output [`ADDR_BYTES-1:0] o_mem_sel,
-    input o_mem_exception
+    input o_mem_exception,
+
+    output dbg_out
 );
 
 wire [`RW-1:0] mem_result = (i_mem_width ? (i_addr[0] ? (i_mem_data>>`RW'h8) : (i_mem_data&`RW'hff)) : i_mem_data);
@@ -51,5 +53,7 @@ always @(posedge i_clk) begin
         o_mem_req <= 1'b0;
     end
 end
+
+assign dbg_out = o_ready;
     
 endmodule

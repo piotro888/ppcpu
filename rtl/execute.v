@@ -47,7 +47,11 @@ module execute (
     output [`RW-1:0] sr_bus_addr, sr_bus_data_o,
     output sr_bus_we,
     output reg o_icache_flush,
-    input i_mem_exception
+    input i_mem_exception,
+
+    output [32:0] dbg_out,
+    input dbg_hold,
+    input [`REGNO_LOG-1:0] dbg_reg_sel
 );
 
 reg next_ready_delayed;
@@ -58,7 +62,7 @@ wire raw_hazard = ((c_used_operands[0] & o_reg_ie[c_l_reg_sel]) |
 
 wire i_invalidate = i_flush | irq;
 // hazard doesn't invalidate instructions, only holds it
-wire hold_req = raw_hazard;
+wire hold_req = raw_hazard | dbg_hold;
 
 wire i_valid = i_submit & ~i_invalidate;
 reg hold_valid;
@@ -108,11 +112,12 @@ assign o_pc_update = exec_submit;
 assign o_exec_pc = pc_val;
 wire [`RW-1:0] sreg_in = reg_r_con;
 reg [`RW-1:0] sreg_out;
+wire [`RW-1:0] dbg_reg_out;
 
 // Submodules
 rf rf(.i_clk(i_clk), .i_rst(i_rst), .i_d(i_reg_data), .o_lout(reg_l_con),
     .o_rout(reg_r_con), .i_lout_sel(c_l_reg_sel), .i_rout_sel(c_r_reg_sel),
-    .i_ie(i_reg_ie), .i_gie(1'b1), .dbg_r0(dbg_r0));
+    .i_ie(i_reg_ie), .i_gie(1'b1), .dbg_r0(dbg_r0), .dbg_sel(dbg_reg_sel), .dbg_reg(dbg_reg_out));
 
 alu alu(.i_l(alu_l_bus), .i_r(alu_r_bus), .o_out(alu_bus), .i_mode(c_alu_mode), 
     .o_flags(alu_flags_d), .i_carry(alu_flags_q[`ALU_FLAG_C] & c_alu_carry_en));
@@ -310,6 +315,8 @@ always @(posedge i_clk)
 assign sr_bus_addr = i_imm;
 assign sr_bus_we = c_sreg_store & exec_submit;
 assign sr_bus_data_o = sreg_in;
+
+assign dbg_out = {o_ready, pc_val, dbg_reg_out};
 
 endmodule
 

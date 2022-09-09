@@ -22,7 +22,10 @@ module upper_core (
     output reg wb_8_burst, wb_4_burst,
 
     input i_irq,
-    output [`RW-1:0] dbg_r0, dbg_pc
+    output [`RW-1:0] dbg_r0, dbg_pc,
+
+    output [61:0] dbg_out,
+    input [3:0] dbg_in
 );
 
 // fetch input singals
@@ -42,11 +45,13 @@ wire [`RW-1:0] sr_bus_addr, sr_bus_data_o;
 wire sr_bus_we;
 wire cc_instr_page, cc_data_page, icache_flush, dcache_exception;
 wire data_cacheable;
+wire [35:0] dbg_out_core;
 
 core core (.i_clk(i_clk), .i_rst(i_rst), .o_req_addr(fetch_req_addr), .o_req_active(fetch_req_active), .i_req_data(fetch_req_data), .i_req_data_valid(fetch_req_ack),
     .o_mem_addr(data_mem_addr), .o_mem_data(data_o_mem_data), .i_mem_data(data_i_mem_data), .o_mem_req(data_mem_req), .o_mem_we(data_mem_we), .i_mem_ack(data_mem_ack),
     .dbg_r0(dbg_r0), .dbg_pc(dbg_pc), .i_irq(i_irq), .o_req_ppl_submit(fetch_ppl_submit), .o_c_instr_page(cc_instr_page), .sr_bus_addr(sr_bus_addr),
-    .sr_bus_data_o(sr_bus_data_o), .sr_bus_we(sr_bus_we), .o_icache_flush(icache_flush), .o_mem_sel(data_mem_sel), .o_c_data_page(cc_data_page), .i_mem_exception(dcache_exception));
+    .sr_bus_data_o(sr_bus_data_o), .sr_bus_we(sr_bus_we), .o_icache_flush(icache_flush), .o_mem_sel(data_mem_sel), .o_c_data_page(cc_data_page),
+    .i_mem_exception(dcache_exception), .dbg_out(dbg_out_core), .dbg_in(dbg_in));
 
 wire fetch_wb_cyc, fetch_wb_stb, fetch_wb_we;
 reg fetch_wb_ack, fetch_wb_err, fetch_wb_rty;
@@ -106,6 +111,8 @@ always @(*) begin
         wb_8_burst = 1'b1;
     end
 end
+
+assign dbg_out = {wb_adr, wb_we, wb_cyc&wb_stb, dbg_out_core};
 
 endmodule
 
