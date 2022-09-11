@@ -1,6 +1,11 @@
 `include "config.v"
 
 module core (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
+
     input i_clk,
     input i_rst,
 
@@ -41,7 +46,11 @@ wire [`RW-1:0] execute_fetch_pc;
 wire fde_pipeline_flush;
 
 // Pipeline stage 0 - FETCH
-fetch fetch (.i_clk(i_clk), .i_rst(i_rst), .mem_addr(o_req_addr), .mem_submit(o_req_ppl_submit),
+fetch fetch (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .mem_addr(o_req_addr), .mem_submit(o_req_ppl_submit),
     .mem_data(i_req_data), .mem_ack(i_req_data_valid), .i_next_ready(fetch_decode_next_ready),
     .o_submit(fetch_decode_submit), .o_instr(fetch_decode_d_instr), .o_jmp_predict(fetch_decode_jmp_pred),
     .i_exec_pc(execute_fetch_pc), .i_flush(fde_pipeline_flush), .dbg_out(dbg_out[33]));
@@ -64,7 +73,11 @@ wire [1:0] dec_used_operands;
 wire dec_sreg_load, dec_sreg_store, dec_sreg_jal_over, dec_sreg_irt, dec_sys;
 
 // Pipeline stage 1 - DECODE
-decode decode(.i_clk(i_clk), .i_rst(i_rst), .o_ready(fetch_decode_next_ready), .o_submit(decode_execute_submit),
+decode decode(
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .o_ready(fetch_decode_next_ready), .o_submit(decode_execute_submit),
     .i_next_ready(decode_execute_next_ready), .i_instr_l(fetch_decode_d_instr[15:0]), .i_imm_pass(fetch_decode_d_instr[`I_SIZE-1:16]),
     .o_imm_pass(de_imm_pass), .oc_pc_inc(dec_pc_inc), .oc_pc_ie(dec_pc_ie), .oc_r_bus_imm(dec_r_bus_imm), .oc_alu_mode(dec_alu_mode),
     .oc_alu_flags_ie(dec_alu_flags_ie), .oc_alu_carry_en(dec_alu_carry_en), .oc_l_reg_sel(dec_l_reg_sel), .oc_r_reg_sel(dec_r_reg_sel),
@@ -83,7 +96,11 @@ wire ew_submit;
 wire ew_next_ready;
 
 // Pipeline stage 2 - EXECUTE
-execute execute(.i_clk(i_clk), .i_rst(i_rst), .o_ready(decode_execute_next_ready), .i_imm(de_imm_pass), .c_pc_inc(dec_pc_inc),
+execute execute(
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .o_ready(decode_execute_next_ready), .i_imm(de_imm_pass), .c_pc_inc(dec_pc_inc),
     .c_pc_ie(dec_pc_ie), .c_r_bus_imm(dec_r_bus_imm), .c_alu_mode(dec_alu_mode), .c_alu_flags_ie(dec_alu_flags_ie), 
     .c_alu_carry_en(dec_alu_carry_en), .c_l_reg_sel(dec_l_reg_sel), .c_r_reg_sel(dec_r_reg_sel), .c_rf_ie(dec_rf_ie), 
     .dbg_pc(dbg_pc), .dbg_r0(dbg_r0), .i_submit(decode_execute_submit), .c_jump_cond_code(dec_jump_cond_code), .o_pc_update(execute_fetch_pc_update),
@@ -95,7 +112,11 @@ execute execute(.i_clk(i_clk), .i_rst(i_rst), .o_ready(decode_execute_next_ready
     .o_mem_width(ew_mem_width), .o_c_data_page(o_c_data_page), .i_mem_exception(i_mem_exception), .dbg_out(dbg_out[32:0]), .dbg_reg_sel(dbg_in[2:0]), .dbg_hold(dbg_in[3]));
 
 // Pipeline stage 3 - MEM&WB
-memwb memwb(.i_clk(i_clk), .i_rst(i_rst), .i_data(ew_data), .i_addr(ew_addr), .i_reg_ie(ew_reg_ie), .i_mem_access(ew_mem_access), .i_mem_we(ew_mem_we),
+memwb memwb(
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_data(ew_data), .i_addr(ew_addr), .i_reg_ie(ew_reg_ie), .i_mem_access(ew_mem_access), .i_mem_we(ew_mem_we),
     .o_reg_ie(we_reg_ie), .o_reg_data(we_reg_data), .i_submit(ew_submit), .o_ready(ew_next_ready), .o_mem_req(o_mem_req), .o_mem_addr(o_mem_addr),
     .o_mem_data(o_mem_data), .o_mem_we(o_mem_we), .i_mem_data(i_mem_data), .i_mem_ack(i_mem_ack), .i_mem_width(ew_mem_width), .o_mem_sel(o_mem_sel),
     .o_mem_exception(i_mem_exception), .dbg_out(dbg_out[35]));

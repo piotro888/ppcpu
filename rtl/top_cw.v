@@ -6,6 +6,11 @@
 `define WB_SEL_BITS 2
 
 module top_cw (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
+
     input wire i_clk,
     input wire i_rst,
 
@@ -40,6 +45,9 @@ assign u_wb_ack = u_wb_ack_mxed | u_wb_ack_clk;
 wire [`RW-1:0] dbg_r0, ignore_dbg_pc;
 
 upper_core upc (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
     .i_clk(i_clk),
     .i_rst(s_rst),
     .wb_cyc(u_wb_cyc),
@@ -68,6 +76,9 @@ wire cmp_clk;
 
 `define CLK_DIV_ADDR `WB_ADDR_W'h001001
 clock_div clock_div (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
     .i_clk(i_clk),
     .i_rst(s_rst),
     .o_clk(cmp_clk),
@@ -88,6 +99,9 @@ wire cc_wb_err;
 wire [`WB_SEL_BITS-1:0] cc_wb_sel;
 
 wb_cross_clk wb_ucross_clk (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
     .clk_m(i_clk),
     .clk_s(cmp_clk),
     .m_rst(s_rst),
@@ -136,6 +150,9 @@ assign u_wb_err = (ic_split_clock ? u_wb_err_cc : c_wb_err_cmp);
 assign u_wb_i_dat = (ic_split_clock ? u_wb_i_dat_cc : c_wb_i_dat_cmp);
 
 wb_compressor wb_compressor(
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
     .i_clk(cw_clk),
     .i_rst(cw_rst),
 
@@ -165,12 +182,18 @@ assign cw_rst = (ic_split_clock ? cw_rst_z : s_rst);
 wire cw_rst, s_rst, cw_rst_z;
 
 reset_sync rst_clk_sync (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
     .i_clk(i_clk),
     .i_rst(i_rst),
     .o_rst(s_rst)
 );
 
 reset_sync rst_cw_sync (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
     .i_clk(cw_clk),
     .i_rst(i_rst),
     .o_rst(cw_rst_z)

@@ -2,6 +2,11 @@
 `include "config.v"
 
 module memwb (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
+
     input i_clk,
     input i_rst,
 

@@ -8,6 +8,11 @@
 `define SR_START_ADDR `RW'h10
 
 module mmu (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
+
     input i_clk,
     input i_rst,
 

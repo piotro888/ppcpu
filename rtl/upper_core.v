@@ -6,6 +6,11 @@
 `define WB_SEL_BITS 2
 
 module upper_core (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
+
     input wire i_clk,
     input wire i_rst,
 
@@ -47,7 +52,11 @@ wire cc_instr_page, cc_data_page, icache_flush, dcache_exception;
 wire data_cacheable;
 wire [35:0] dbg_out_core;
 
-core core (.i_clk(i_clk), .i_rst(i_rst), .o_req_addr(fetch_req_addr), .o_req_active(fetch_req_active), .i_req_data(fetch_req_data), .i_req_data_valid(fetch_req_ack),
+core core (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .o_req_addr(fetch_req_addr), .o_req_active(fetch_req_active), .i_req_data(fetch_req_data), .i_req_data_valid(fetch_req_ack),
     .o_mem_addr(data_mem_addr), .o_mem_data(data_o_mem_data), .i_mem_data(data_i_mem_data), .o_mem_req(data_mem_req), .o_mem_we(data_mem_we), .i_mem_ack(data_mem_ack),
     .dbg_r0(dbg_r0), .dbg_pc(dbg_pc), .i_irq(i_irq), .o_req_ppl_submit(fetch_ppl_submit), .o_c_instr_page(cc_instr_page), .sr_bus_addr(sr_bus_addr),
     .sr_bus_data_o(sr_bus_data_o), .sr_bus_we(sr_bus_we), .o_icache_flush(icache_flush), .o_mem_sel(data_mem_sel), .o_c_data_page(cc_data_page),
@@ -67,18 +76,38 @@ wire [`WB_ADDR_W-1:0]  data_wb_adr;
 wire [`WB_SEL_BITS-1:0] data_wb_sel;
 wire data_wb_4_burst;
 
-icache icache(.i_clk(i_clk), .i_rst(i_rst), .mem_req(fetch_req_active), .mem_addr(fetch_req_addr), .mem_data(fetch_req_data), .mem_ack(fetch_req_ack), .mem_ppl_submit(fetch_ppl_submit),
+icache icache(
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .mem_req(fetch_req_active), .mem_addr(fetch_req_addr), .mem_data(fetch_req_data), .mem_ack(fetch_req_ack), .mem_ppl_submit(fetch_ppl_submit),
     .wb_cyc(fetch_wb_cyc), .wb_stb(fetch_wb_stb), .wb_we(fetch_wb_we), .wb_ack(fetch_wb_ack), .wb_i_dat(wb_i_dat), .wb_adr(fetch_wb_adr), .wb_sel(fetch_wb_sel), .mem_cache_flush(icache_flush), .wb_err(fetch_wb_err));
 
-dcache dcache(.i_clk(i_clk), .i_rst(i_rst), .mem_req(data_mem_req), .mem_addr(data_mem_addr_paged), .mem_i_data(data_o_mem_data), .mem_o_data(data_i_mem_data), .mem_we(data_mem_we), .mem_ack(data_mem_ack), .mem_sel(data_mem_sel),
+dcache dcache(
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .mem_req(data_mem_req), .mem_addr(data_mem_addr_paged), .mem_i_data(data_o_mem_data), .mem_o_data(data_i_mem_data), .mem_we(data_mem_we), .mem_ack(data_mem_ack), .mem_sel(data_mem_sel),
     .wb_cyc(data_wb_cyc), .wb_stb(data_wb_stb), .wb_we(data_wb_we), .wb_ack(data_wb_ack), .wb_i_dat(wb_i_dat), .wb_o_dat(data_wb_o_dat), .wb_adr(data_wb_adr), .wb_sel(data_wb_sel), .mem_cache_enable(data_cacheable), .wb_4_burst(data_wb_4_burst), .wb_err(data_wb_err), .mem_exception(dcache_exception));
 
-immu i_mmu(.i_clk(i_clk), .i_rst(i_rst), .i_addr(fetch_wb_adr), .o_addr(fetch_wb_adr_paged), .i_sr_addr(sr_bus_addr), .i_sr_data(sr_bus_data_o), .i_sr_we(sr_bus_we), .c_pag_en(cc_instr_page));
+immu i_mmu(
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_addr(fetch_wb_adr), .o_addr(fetch_wb_adr_paged), .i_sr_addr(sr_bus_addr), .i_sr_data(sr_bus_data_o), .i_sr_we(sr_bus_we), .c_pag_en(cc_instr_page));
 
-dmmu d_mmu(.i_clk(i_clk), .i_rst(i_rst), .i_addr(data_mem_addr), .o_addr(data_mem_addr_paged), .i_sr_addr(sr_bus_addr), .i_sr_data(sr_bus_data_o), .i_sr_we(sr_bus_we), .c_pag_en(cc_data_page), .o_cacheable(data_cacheable));
+dmmu d_mmu(
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_addr(data_mem_addr), .o_addr(data_mem_addr_paged), .i_sr_addr(sr_bus_addr), .i_sr_data(sr_bus_data_o), .i_sr_we(sr_bus_we), .c_pag_en(cc_data_page), .o_cacheable(data_cacheable));
 
 wire arb_sel;
-wishbone_priority_arbiter wb_arb(.i_clk(i_clk), .i_rst(i_rst), .i_wb0_cyc(data_wb_cyc), .i_wb1_cyc(fetch_wb_cyc), .o_wb_cyc(wb_cyc), .o_sel_sig(arb_sel));
+wishbone_priority_arbiter wb_arb(
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_wb0_cyc(data_wb_cyc), .i_wb1_cyc(fetch_wb_cyc), .o_wb_cyc(wb_cyc), .o_sel_sig(arb_sel));
 
 always @(*) begin
     if(~arb_sel) begin

@@ -2,6 +2,10 @@
 `define MAX_DIV_LOG 4
 
 module clock_div (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
     input i_clk,
     input i_rst,
 

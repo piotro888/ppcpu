@@ -1,6 +1,11 @@
 `include "config.v"
 
 module alu (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
+
     input [`RW-1:0] i_l, i_r,
     output [`RW-1:0] o_out,
 

@@ -4,6 +4,11 @@
 `define OUT_ADDR_W 24
 
 module immu (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
+
     input i_clk,
     input i_rst,
 

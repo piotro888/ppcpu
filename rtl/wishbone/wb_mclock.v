@@ -1,6 +1,11 @@
 `include "config.v"
 
 module wb_cross_clk (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
+
     input clk_m,
     input clk_s,
     input m_rst,
@@ -127,6 +132,9 @@ wire ssy_newreq = prev_xor_newreq ^ ssy_flag_newreq;
 `define SM_SYNC_W 2+16
 wire [`SM_SYNC_W-1:0] smsync1;
 ff_mb_sync #(.DATA_W(`SM_SYNC_W)) s_m_sync (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
     .src_clk(clk_s),
     .dst_clk(clk_m),
     .src_rst(s_rst),
@@ -147,6 +155,9 @@ wire msy_xor_err = smsync1[1];
 wire [`MS_SYNC_W-1:0] mssync1;
 
 ff_mb_sync #(.DATA_W(`MS_SYNC_W)) m_s_sync (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
     .src_clk(clk_m),
     .dst_clk(clk_s),
     .src_rst(m_rst),

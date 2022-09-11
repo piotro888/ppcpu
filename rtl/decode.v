@@ -1,6 +1,11 @@
 `include "config.v"
 
 module decode (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
+
     input wire i_clk,
     input wire i_rst,
 

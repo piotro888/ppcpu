@@ -1,6 +1,11 @@
 `include "config.v"
 
 module execute (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
+
     input i_clk,
     input i_rst,
 
@@ -115,19 +120,35 @@ reg [`RW-1:0] sreg_out;
 wire [`RW-1:0] dbg_reg_out;
 
 // Submodules
-rf rf(.i_clk(i_clk), .i_rst(i_rst), .i_d(i_reg_data), .o_lout(reg_l_con),
+rf rf(
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_d(i_reg_data), .o_lout(reg_l_con),
     .o_rout(reg_r_con), .i_lout_sel(c_l_reg_sel), .i_rout_sel(c_r_reg_sel),
     .i_ie(i_reg_ie), .i_gie(1'b1), .dbg_r0(dbg_r0), .dbg_sel(dbg_reg_sel), .dbg_reg(dbg_reg_out));
 
-alu alu(.i_l(alu_l_bus), .i_r(alu_r_bus), .o_out(alu_bus), .i_mode(c_alu_mode), 
+alu alu(
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_l(alu_l_bus), .i_r(alu_r_bus), .o_out(alu_bus), .i_mode(c_alu_mode), 
     .o_flags(alu_flags_d), .i_carry(alu_flags_q[`ALU_FLAG_C] & c_alu_carry_en));
 
-pc pc(.i_clk(i_clk), .i_rst(i_rst), .i_bus(c_sreg_store | c_sreg_irt ? (c_sreg_irt ? sreg_out : sreg_in) : alu_bus),
+pc pc(
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_bus(c_sreg_store | c_sreg_irt ? (c_sreg_irt ? sreg_out : sreg_in) : alu_bus),
     .i_c_pc_inc((c_pc_inc | (~jump_dec_en & jump_dec_valid)) & exec_submit), .i_c_pc_ie((c_pc_ie | (jump_dec_en & jump_dec_valid) | pc_write) & exec_submit),
     .o_pc(pc_val), .i_c_pc_irq(irq));
 
 // Cpu control registers
-register  #(.N(`ALU_FLAG_CNT)) alu_flag_reg (.i_clk(i_clk), .i_rst(i_rst), .i_d((alu_flags_sreg_ie ? sreg_in[`ALU_FLAG_CNT-1:0] : alu_flags_d)),
+register  #(.N(`ALU_FLAG_CNT)) alu_flag_reg (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_d((alu_flags_sreg_ie ? sreg_in[`ALU_FLAG_CNT-1:0] : alu_flags_d)),
     .o_d(alu_flags_q), .i_ie((c_alu_flags_ie | alu_flags_sreg_ie) & exec_submit));
 
 // JUMP DECODE
@@ -284,28 +305,52 @@ end
 
 
 wire [`RW-1:0] priv_in = (irq ? (sreg_priv_control_out & `RW'hfff9) : (c_sreg_irt ? (sreg_priv_control_out | `RW'h0004) : sreg_in)); // disable irq and paging flag on interrupt and re-enable on return
-register #(.RESET_VAL(`RW'b001)) sreg_priv_control (.i_clk(i_clk), .i_rst(i_rst), .i_d(priv_in), .o_d(sreg_priv_control_out),
+register #(.RESET_VAL(`RW'b001)) sreg_priv_control (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_d(priv_in), .o_d(sreg_priv_control_out),
     .i_ie((((sreg_priv_control_ie & sreg_priv_mode) | c_sreg_irt) & exec_submit) | irq));
 
 wire irq_en = sreg_priv_control_out[2], sreg_priv_mode = sreg_priv_control_out[0];
 assign o_c_data_page = sreg_priv_control_out[1];
 
-register sreg_irq_pc (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_pc_ie ? sreg_in : (i_mem_exception ? mem_stage_pc : pc_val)), .o_d(sreg_irq_pc_out), .i_ie(irq | (sreg_irq_pc_ie & exec_submit)));
+register sreg_irq_pc (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_pc_ie ? sreg_in : (i_mem_exception ? mem_stage_pc : pc_val)), .o_d(sreg_irq_pc_out), .i_ie(irq | (sreg_irq_pc_ie & exec_submit)));
 
 wire [1:0] sreg_jtr_buff_o, sreg_jtr_out;
 wire jtr_jump_en = (sreg_irq_pc_ie | jump_dec_valid | c_sreg_irt) & exec_submit;
 wire jtr_irqh_write = irq;
 wire [1:0] jtr_buff_in = (irq ? 2'b00 : sreg_in[1:0]);
 wire [1:0] jtr_in = (irq ? 2'b00 : sreg_jtr_buff_o);
-register  #(.RESET_VAL(2'b01), .N(2)) sreg_jtr_buff (.i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_buff_in), .o_d(sreg_jtr_buff_o), .i_ie(sreg_jtr_ie | jtr_irqh_write));
-register  #(.RESET_VAL(2'b01), .N(2)) sreg_jtr (.i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_in), .o_d(sreg_jtr_out), .i_ie(jtr_jump_en | jtr_irqh_write));
+register  #(.RESET_VAL(2'b01), .N(2)) sreg_jtr_buff (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_buff_in), .o_d(sreg_jtr_buff_o), .i_ie(sreg_jtr_ie | jtr_irqh_write));
+register  #(.RESET_VAL(2'b01), .N(2)) sreg_jtr (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_in), .o_d(sreg_jtr_out), .i_ie(jtr_jump_en | jtr_irqh_write));
 assign o_c_instr_page = sreg_jtr_out[0];
 wire trap_flag = sreg_jtr_out[1];
 
-register sreg_scratch (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_in), .o_d(sreg_scratch_out), .i_ie(sreg_scratch_ie & exec_submit));
+register sreg_scratch (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_in), .o_d(sreg_scratch_out), .i_ie(sreg_scratch_ie & exec_submit));
 
 wire [3:0] sreg_irq_flags_in = {i_mem_exception, trap_exception, prev_sys, (i_irq & irq_en)}, sreg_irq_flags_out;
-register #(.N(4)) sreg_irq_flags (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_flags_in), .o_d(sreg_irq_flags_out), .i_ie(irq));
+register #(.N(4)) sreg_irq_flags (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_flags_in), .o_d(sreg_irq_flags_out), .i_ie(irq));
 
 wire immu_write = c_sreg_store & exec_submit & (sr_bus_addr >= `RW'h100 && sr_bus_addr < `RW'h100 + 16); // flush after write to mmu is executed
 wire flush_instr_mmu = (immu_write & o_c_instr_page) | ((jtr_in[0] ^ sreg_jtr_out[0]) & (jtr_jump_en | jtr_irqh_write));

@@ -1,6 +1,11 @@
 `include "config.v"
 
 module rf (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
+
     input i_clk,
     input i_rst,
 
@@ -30,6 +35,9 @@ genvar i;
 generate
     for (i=0; i<`REGNO; i=i+1) begin : rf_regs
         register rf_reg(
+`ifdef USE_POWER_PINS
+            .vccd1(vccd1), .vssd1(vssd1),
+`endif
             .i_clk(i_clk),
             .i_rst(i_rst),
             .i_d(i_d),
@@ -42,6 +50,10 @@ endgenerate
 endmodule
 
 module register #(parameter N = `RW, parameter RESET_VAL = 0) (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
     input i_clk,
     input i_rst,
 
