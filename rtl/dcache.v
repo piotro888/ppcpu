@@ -267,5 +267,3 @@ always @* begin
 end
 
 endmodule
-
-`include "dcache_ram.v"
