@@ -9,10 +9,11 @@ module clock_div (
     input i_clk,
     input i_rst,
 
-    output reg o_clk,
+    output o_clk,
 
     input [`MAX_DIV_LOG-1:0] div,
-    input div_we
+    input div_we,
+    input clock_sel
 );
 
 // ADD 130 buff
@@ -20,6 +21,9 @@ module clock_div (
 reg [`MAX_DIV-1:0] cnt;
 reg [`MAX_DIV_LOG-1:0] curr_div, next_div_buff;
 reg next_div_val;
+
+reg res_clk;
+assign o_clk = (clock_sel_r ? res_clk : i_clk);
 
 always @(posedge i_clk) begin
     if (~cnt[curr_div]) begin
@@ -31,7 +35,7 @@ end
 
 always @(posedge i_clk) begin
     if (cnt[curr_div])
-        o_clk <= ~o_clk;
+        res_clk <= ~res_clk;
 end
 
 always @(posedge i_clk) begin
@@ -49,5 +53,9 @@ always @(posedge i_clk) begin
         end
     end
 end
+
+reg clock_sel_r;
+always @(posedge i_clk)
+    clock_sel_r <= clock_sel;
 
 endmodule

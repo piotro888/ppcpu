@@ -65,7 +65,7 @@ icache_ram  mem (
 `endif
     .i_clk(i_clk), .i_rst(i_rst | mem_cache_flush), .i_addr((|cache_we) ? wire_index : read_index), .i_data(cache_mem_in),
     .o_data(cache_out[0]), .i_we(cache_we[0]));
-assign cache_hit[0] = (cache_out[0][`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE] == compare_tag) && cache_out[0][0]; 
+ assign cache_hit[0] = (cache_out[0][`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE] == compare_tag) && cache_out[0][0]; 
 
 assign mem_ack = cache_ghit | mem_fetch_end;
 

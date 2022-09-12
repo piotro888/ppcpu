@@ -39,9 +39,9 @@ always @* begin
         `ALU_MODE_SHR:
             outc = {1'b0, i_l >> i_r};
         `ALU_MODE_MUL: // temporary
-            outc = {1'b0, i_l * i_r};
+            outc = {1'b0, 16'b0};
         `ALU_MODE_DIV: // temporary
-            outc = {1'b0, i_l / i_r};
+            outc = {1'b0, 16'b0};
         `ALU_MODE_ASHR:
             outc = {1'b0, (i_l >> i_r) | ({`RW{i_l[`RW-1]}} << (`RW-i_r))};
         `ALU_MODE_SEXT:

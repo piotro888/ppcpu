@@ -19,7 +19,7 @@ module tb_upcomp (
     output reg [`WB_SEL_BITS-1:0] wb_sel,
 
     input i_irq,
-    output [61+16:0] dbg_out
+    output [61:0] dbg_out
 );
 
 wire cw_clk;

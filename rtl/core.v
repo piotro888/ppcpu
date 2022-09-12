@@ -122,8 +122,3 @@ memwb memwb(
     .o_mem_exception(i_mem_exception), .dbg_out(dbg_out[35]));
 
 endmodule
-
-`include "fetch.v"
-`include "decode.v"
-`include "execute.v"
-`include "memwb.v"

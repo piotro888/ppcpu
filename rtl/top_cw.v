@@ -23,7 +23,7 @@ module top_cw (
     output cw_clk,
     input i_irq,
 
-    output [61+16:0] dbg_out,
+    output [61:0] dbg_out,
     input [4:0] dbg_in
 );
 
@@ -70,8 +70,6 @@ upper_core upc (
     .dbg_out(dbg_out[61:0])
 );
 
-assign dbg_out[77:62] = dbg_r0;
-
 wire cmp_clk;
 
 `define CLK_DIV_ADDR `WB_ADDR_W'h001001
@@ -83,7 +81,8 @@ clock_div clock_div (
     .i_rst(s_rst),
     .o_clk(cmp_clk),
     .div(u_wb_o_dat[3:0]),
-    .div_we(u_wb_cyc & u_wb_stb & u_wb_we & (u_wb_adr == `CLK_DIV_ADDR))
+    .div_we(u_wb_cyc & u_wb_stb & u_wb_we & (u_wb_adr == `CLK_DIV_ADDR)),
+    .clock_sel(ic_split_clock)
 );
 assign u_wb_ack_clk = u_wb_cyc & u_wb_stb & u_wb_we & (u_wb_adr == `CLK_DIV_ADDR);
 
@@ -98,7 +97,7 @@ wire cc_wb_ack;
 wire cc_wb_err;
 wire [`WB_SEL_BITS-1:0] cc_wb_sel;
 
-wb_cross_clk wb_ucross_clk (
+wb_cross_clk wb_cross_clk (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif
@@ -177,7 +176,7 @@ wb_compressor wb_compressor(
     .wb_8_burst(c_wb_8_burst)
 );
 
-assign cw_clk = (ic_split_clock ? cmp_clk : i_clk);
+assign cw_clk = cmp_clk; // clock is muxed inside clock_div moudle
 assign cw_rst = (ic_split_clock ? cw_rst_z : s_rst);
 wire cw_rst, s_rst, cw_rst_z;
 

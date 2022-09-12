@@ -177,5 +177,3 @@ assign s_wb_adr = mssync1[45:22];
 assign s_wb_cyc = mssync1[46];
 
 endmodule
-
-`include "ff_mb_sync.v"

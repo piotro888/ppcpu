@@ -64,7 +64,7 @@ core core (
 
 wire fetch_wb_cyc, fetch_wb_stb, fetch_wb_we;
 reg fetch_wb_ack, fetch_wb_err, fetch_wb_rty;
-wire [`WB_DATA_W-1:0] fetch_wb_o_dat;
+wire [`WB_DATA_W-1:0] fetch_wb_o_dat = `WB_DATA_W'b0;
 wire [`RW-1:0]  fetch_wb_adr;
 wire [`WB_ADDR_W-1:0]  fetch_wb_adr_paged;
 wire [`WB_SEL_BITS-1:0] fetch_wb_sel;

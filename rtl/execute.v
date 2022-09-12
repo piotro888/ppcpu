@@ -364,7 +364,3 @@ assign sr_bus_data_o = sreg_in;
 assign dbg_out = {o_ready, pc_val, dbg_reg_out};
 
 endmodule
-
-`include "alu.v"
-`include "rf.v"
-`include "pc.v"
