@@ -107,39 +107,10 @@ wishbone_priority_arbiter wb_arb(
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif
-    .i_clk(i_clk), .i_rst(i_rst), .i_wb0_cyc(data_wb_cyc), .i_wb1_cyc(fetch_wb_cyc), .o_wb_cyc(wb_cyc), .o_sel_sig(arb_sel));
-
-always @(*) begin
-    if(~arb_sel) begin
-        wb_stb = data_wb_stb;
-        wb_o_dat = data_wb_o_dat;
-        wb_adr = data_wb_adr;
-        wb_we = data_wb_we;
-        wb_sel = data_wb_sel;
-        data_wb_ack = wb_ack;
-        data_wb_err = wb_err;
-        data_wb_rty = wb_rty;
-        fetch_wb_ack = 1'b0;
-        fetch_wb_err = 1'b0;
-        fetch_wb_rty = 1'b0;
-        wb_4_burst = data_wb_4_burst;
-        wb_8_burst = 1'b0;
-    end else begin
-        wb_stb = fetch_wb_stb;
-        wb_o_dat = fetch_wb_o_dat;
-        wb_adr = fetch_wb_adr_paged;
-        wb_we = fetch_wb_we;
-        wb_sel = fetch_wb_sel;
-        fetch_wb_ack = wb_ack;
-        fetch_wb_err = wb_err;
-        fetch_wb_rty = wb_rty;
-        data_wb_ack = 1'b0;
-        data_wb_err = 1'b0;
-        data_wb_rty = 1'b0;
-        wb_4_burst = 1'b0;
-        wb_8_burst = 1'b1;
-    end
-end
+    .i_clk(i_clk), .i_rst(i_rst), .i_wb0_cyc(data_wb_cyc), .i_wb1_cyc(fetch_wb_cyc), .o_wb_cyc(wb_cyc), .o_sel_sig(arb_sel),
+    .wb0_stb(data_wb_stb), .wb0_we(data_wb_we), .wb0_ack(data_wb_ack), .wb0_adr(data_wb_adr), .wb0_sel(data_wb_sel), .wb0_err(data_wb_err), .wb0_o_dat(data_wb_o_dat), .wb0_4_burst(data_wb_4_burst), .wb0_8_burst(1'b0),
+    .wb1_stb(fetch_wb_stb), .wb1_we(fetch_wb_we), .wb1_ack(fetch_wb_ack), .wb1_adr(fetch_wb_adr_paged), .wb1_sel(fetch_wb_sel), .wb1_err(fetch_wb_err), .wb1_o_dat(`RW'b0), .wb1_4_burst(1'b0), .wb1_8_burst(1'b1),
+    .owb_stb(wb_stb), .owb_we(wb_we), .owb_ack(wb_ack), .owb_adr(wb_adr), .owb_sel(wb_sel), .owb_err(wb_err), .owb_o_dat(wb_o_dat), .owb_4_burst(wb_4_burst), .owb_8_burst(wb_8_burst));
 
 assign dbg_out = {wb_adr, wb_we, wb_cyc&wb_stb, dbg_out_core};
 
