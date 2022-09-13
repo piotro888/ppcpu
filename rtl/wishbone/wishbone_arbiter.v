@@ -1,6 +1,6 @@
 `include "config.v"
 
-module wishbone_priority_arbiter (
+module wishbone_arbiter (
 `ifdef USE_POWER_PINS
     inout vccd1,
     inout vssd1,
@@ -21,8 +21,8 @@ module wishbone_priority_arbiter (
     input wb0_we,
     input [1:0] wb0_sel,
     input wb0_8_burst, wb0_4_burst,
-    output wb0_ack,
-    output wb0_err,
+    output reg wb0_ack,
+    output reg wb0_err,
 
     input wb1_stb,
     input [`WB_ADDR_W-1:0] wb1_adr,
@@ -30,17 +30,17 @@ module wishbone_priority_arbiter (
     input wb1_we,
     input [1:0] wb1_sel,
     input wb1_8_burst, wb1_4_burst,
-    output wb1_ack,
-    output wb1_err,
+    output reg wb1_ack,
+    output reg wb1_err,
 
-    output owb_stb,
-    output [`WB_ADDR_W-1:0] owb_adr,
-    output [`RW-1:0] owb_o_dat,
-    output owb_we,
-    output [1:0] owb_sel,
+    output reg owb_stb,
+    output reg [`WB_ADDR_W-1:0] owb_adr,
+    output reg [`RW-1:0] owb_o_dat,
+    output reg owb_we,
+    output reg [1:0] owb_sel,
     input owb_ack,
     input owb_err,
-    output owb_8_burst, owb_4_burst
+    output reg owb_8_burst, owb_4_burst
 );
 
 wire bus_req = i_wb0_cyc | i_wb1_cyc;

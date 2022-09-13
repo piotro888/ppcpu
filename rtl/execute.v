@@ -345,7 +345,8 @@ register sreg_scratch (
 `endif
     .i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_in), .o_d(sreg_scratch_out), .i_ie(sreg_scratch_ie & exec_submit));
 
-wire [3:0] sreg_irq_flags_in = {i_mem_exception, trap_exception, prev_sys, (i_irq & irq_en)}, sreg_irq_flags_out;
+wire [3:0] sreg_irq_flags_in = {i_mem_exception, trap_exception, prev_sys, (i_irq & irq_en)};
+wire [3:0] sreg_irq_flags_out;
 register #(.N(4)) sreg_irq_flags (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),

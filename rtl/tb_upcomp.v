@@ -28,6 +28,7 @@ wire cw_req;
 wire cw_dir;
 wire cw_ack;
 wire cw_err;
+wire cw_rst;
 
 top_cw top_cw (
     .i_clk(i_clk),
@@ -41,9 +42,14 @@ top_cw top_cw (
     .cw_ack(cw_ack),
     .cw_err(cw_err),
     .i_irq(i_irq),
+    .cw_rst(cw_rst),
 
     .dbg_in(5'b10000),
-    .dbg_out(dbg_out)
+    .dbg_out(dbg_out),
+
+    .la_cw_ovr(1'b0),
+    .la_cw_ack('b0),
+    .la_cw_io_i('b0)
 );
 
 wb_decomp wb_decomp (

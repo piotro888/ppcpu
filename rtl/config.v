@@ -1,6 +1,9 @@
 // common values for cpu
 
 // register and data width bits
+`ifndef CONFIG_H
+`define CONFIG_H
+
 `define RW 16
 
 `define REGNO 8
@@ -41,3 +44,5 @@
 // -- SHARED DECODE --
 `define JUMP_CODE_W 5 // 4+1
 `define JUMP_CODE_BIT_EN 4
+
+`endif

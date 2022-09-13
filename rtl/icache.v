@@ -21,13 +21,14 @@ module icache (
     output reg wb_stb,
     input [`RW-1:0] wb_i_dat,
     output [`RW-1:0]  wb_adr,
-    output reg wb_we,
+    output wb_we,
     input wb_ack,
     output [1:0] wb_sel,
     input wb_err
 );
 
 assign wb_sel = 2'b11;
+assign wb_we = 1'b0;
 
 `define TAG_SIZE 9
 `define LINE_SIZE 128
@@ -198,4 +199,5 @@ endmodule
 `undef CACHE_SETS_N
 `undef CACHE_OFF_W
 `undef CACHE_IDX_WIDTH
-`undef CACHE_IDXES 
+`undef CACHE_IDXES
+`undef SW

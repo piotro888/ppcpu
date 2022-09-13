@@ -1,7 +1,7 @@
 `define MAX_DIV 16
 `define MAX_DIV_LOG 4
 
-module clock_div (
+module clk_div (
 `ifdef USE_POWER_PINS
     inout vccd1,
     inout vssd1,
