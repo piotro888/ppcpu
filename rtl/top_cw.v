@@ -27,7 +27,7 @@ module top_cw (
     output cw_rst,
 
     output [61:0] dbg_out,
-    input [4:0] dbg_in,
+    input [5:0] dbg_in,
 
     input [`RW-1:0] la_cw_io_i,
     input la_cw_ack,
@@ -70,7 +70,7 @@ upper_core upc (
     .wb_4_burst(u_wb_4_burst),
     .wb_8_burst(u_wb_8_burst),
 
-    .dbg_in(dbg_in[3:0]),
+    .dbg_in({dbg_in[5], dbg_in[3:0]}),
     .dbg_out(dbg_out[61:0])
 );
 

@@ -1,6 +1,6 @@
 `include "config.v"
 
-module core (
+module core #(parameter CORENO = 0) (
 `ifdef USE_POWER_PINS
     inout vccd1,
     inout vssd1,
@@ -8,6 +8,7 @@ module core (
 
     input i_clk,
     input i_rst,
+    input i_disable,
 
     // fetch input singals
     output [`RW-1:0] o_req_addr,
@@ -30,6 +31,8 @@ module core (
     output sr_bus_we,
     output o_icache_flush,
     input i_mem_exception,
+    input i_mc_core_int,
+    input [`RW-1:0] i_core_int_sreg,
 
     output [35:0] dbg_out,
     input [3:0] dbg_in
@@ -54,7 +57,7 @@ fetch fetch (
     .mem_data(i_req_data), .mem_ack(i_req_data_valid), .i_next_ready(fetch_decode_next_ready),
     .o_submit(fetch_decode_submit), .o_instr(fetch_decode_d_instr), .o_jmp_predict(fetch_decode_jmp_pred),
     .i_exec_pc(execute_fetch_pc), .i_flush(fde_pipeline_flush), .dbg_out(dbg_out[33]));
-assign o_req_active = 1'b1;
+assign o_req_active = ~i_disable;
 
 wire decode_execute_next_ready;
 wire decode_execute_submit;
@@ -73,7 +76,7 @@ wire [1:0] dec_used_operands;
 wire dec_sreg_load, dec_sreg_store, dec_sreg_jal_over, dec_sreg_irt, dec_sys;
 
 // Pipeline stage 1 - DECODE
-decode decode(
+decode decode (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif
@@ -96,7 +99,7 @@ wire ew_submit;
 wire ew_next_ready;
 
 // Pipeline stage 2 - EXECUTE
-execute execute(
+execute #(.CORENO(CORENO)) execute(
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif
@@ -109,7 +112,8 @@ execute execute(
     .i_next_ready(ew_next_ready), .i_reg_ie(we_reg_ie), .i_reg_data(we_reg_data), .c_used_operands(dec_used_operands), .c_sreg_load(dec_sreg_load),
     .c_sreg_store(dec_sreg_store), .c_sreg_jal_over(dec_sreg_jal_over), .i_irq(i_irq), .c_sreg_irt(dec_sreg_irt), .o_c_instr_page(o_c_instr_page),
     .sr_bus_addr(sr_bus_addr), .sr_bus_data_o(sr_bus_data_o), .sr_bus_we(sr_bus_we), .o_icache_flush(o_icache_flush), .c_sys(dec_sys), .c_mem_width(dec_mem_width),
-    .o_mem_width(ew_mem_width), .o_c_data_page(o_c_data_page), .i_mem_exception(i_mem_exception), .dbg_out(dbg_out[32:0]), .dbg_reg_sel(dbg_in[2:0]), .dbg_hold(dbg_in[3]));
+    .o_mem_width(ew_mem_width), .o_c_data_page(o_c_data_page), .i_mem_exception(i_mem_exception), .dbg_out(dbg_out[32:0]), .dbg_reg_sel(dbg_in[2:0]), .dbg_hold(dbg_in[3]),
+    .i_core_int(i_mc_core_int), .i_core_int_sreg(i_core_int_sreg));
 
 // Pipeline stage 3 - MEM&WB
 memwb memwb(

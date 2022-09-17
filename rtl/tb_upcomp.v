@@ -44,7 +44,7 @@ top_cw top_cw (
     .i_irq(i_irq),
     .cw_rst(cw_rst),
 
-    .dbg_in(5'b10000),
+    .dbg_in(6'b000000),
     .dbg_out(dbg_out),
 
     .la_cw_ovr(1'b0),

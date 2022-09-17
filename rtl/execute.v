@@ -1,6 +1,6 @@
 `include "config.v"
 
-module execute (
+module execute #(parameter CORENO = 0) (
 `ifdef USE_POWER_PINS
     inout vccd1,
     inout vssd1,
@@ -53,6 +53,8 @@ module execute (
     output sr_bus_we,
     output reg o_icache_flush,
     input i_mem_exception,
+    input i_core_int,
+    input [`RW-1:0] i_core_int_sreg,
 
     output [32:0] dbg_out,
     input dbg_hold,
@@ -80,7 +82,8 @@ assign o_ready = exec_submit | ~instr_valid;
 
 // At IRQ, current instruction (and state update) is invalidated and pc is saved to sr, to
 // continue execution from current instruction. Flush is requested on next cycle
-wire irq = (i_irq & irq_en) | prev_sys | trap_exception | i_mem_exception;
+wire irq = ((i_irq | i_core_int) & irq_en) | prev_sys | trap_exception | i_mem_exception;
+// core_int is masked as externel event to not interrupt irq handler
 
 always @(posedge i_clk) begin
     if(i_rst) begin
@@ -255,6 +258,8 @@ end
 `define SREG_IRQ_FLAGS `RW'b101
 `define SREG_SCRATCH `RW'b110
 `define SREG_CPUID `RW'b111
+`define SREG_COREID `RW'b1000
+`define SREG_MT_IRQ `RW'b1001 //,1010, 1011
 
 reg pc_sreg_ie, sreg_priv_control_ie, sreg_irq_pc_ie, alu_flags_sreg_ie, sreg_jtr_ie, sreg_scratch_ie;
 wire [`RW-1:0] sreg_priv_control_out, sreg_irq_pc_out, sreg_scratch_out;
@@ -282,14 +287,20 @@ always @* begin
             alu_flags_sreg_ie = c_sreg_store;
         end
         `SREG_IRQ_FLAGS: begin
-            sreg_out = {12'b0, sreg_irq_flags_out};
+            sreg_out = {11'b0, sreg_irq_flags_out};
         end
         `SREG_SCRATCH: begin
             sreg_out = sreg_scratch_out;
             sreg_scratch_ie = c_sreg_store;
         end
         `SREG_CPUID: begin
-            sreg_out = 16'b1111_0000_0011_0001;
+            sreg_out = 16'b1111_0000_0011_0010;
+        end
+        `SREG_COREID: begin
+            sreg_out = CORENO;
+        end
+        `SREG_MT_IRQ: begin // write is handled in upper_core
+            sreg_out = i_core_int_sreg;
         end
         default:
             sreg_out = 16'b0;
@@ -345,9 +356,9 @@ register sreg_scratch (
 `endif
     .i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_in), .o_d(sreg_scratch_out), .i_ie(sreg_scratch_ie & exec_submit));
 
-wire [3:0] sreg_irq_flags_in = {i_mem_exception, trap_exception, prev_sys, (i_irq & irq_en)};
-wire [3:0] sreg_irq_flags_out;
-register #(.N(4)) sreg_irq_flags (
+wire [4:0] sreg_irq_flags_in = {(i_core_int & irq_en), i_mem_exception, trap_exception, prev_sys, (i_irq & irq_en)};
+wire [4:0] sreg_irq_flags_out;
+register #(.N(5)) sreg_irq_flags (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif
