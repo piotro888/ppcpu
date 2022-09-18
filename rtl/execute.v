@@ -1,6 +1,6 @@
 `include "config.v"
 
-module execute #(parameter CORENO = 0) (
+module execute #(parameter CORENO = 0, INT_VEC = 1) (
 `ifdef USE_POWER_PINS
     inout vccd1,
     inout vssd1,
@@ -138,7 +138,7 @@ alu alu(
     .i_l(alu_l_bus), .i_r(alu_r_bus), .o_out(alu_bus), .i_mode(c_alu_mode), 
     .o_flags(alu_flags_d), .i_carry(alu_flags_q[`ALU_FLAG_C] & c_alu_carry_en));
 
-pc pc(
+pc #(.INT_VEC(INT_VEC)) pc (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif

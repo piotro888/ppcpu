@@ -66,7 +66,7 @@ wire [35:0] dbg_out_core1;
 wire i_irq0, i_irq1;
 wire [`RW-1:0] dbg0_r0, dbg0_pc, dbg1_r0, dbg1_pc;
 
-core #(.CORENO(0)) core_0 (
+core #(.CORENO(0), .INT_VEC(1)) core_0 (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif
@@ -76,7 +76,7 @@ core #(.CORENO(0)) core_0 (
     .sr_bus_data_o(sr_bus_data_o0), .sr_bus_we(sr_bus_we0), .o_icache_flush(icache0_flush), .o_mem_sel(data0_mem_sel), .o_c_data_page(cc_data_page0),
     .i_mem_exception(dcache_exception0), .dbg_out(dbg_out_core0), .dbg_in(dbg_in[3:0]), .i_disable(c0_disable), .i_mc_core_int(c0_core_int), .i_core_int_sreg(sr_bus_data_i0));
 
-core #(.CORENO(1)) core_1 (
+core #(.CORENO(1), .INT_VEC(2)) core_1 (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif

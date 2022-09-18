@@ -1,6 +1,6 @@
 `include "config.v"
 
-module core #(parameter CORENO = 0) (
+module core #(parameter CORENO = 0, INT_VEC = 1) (
 `ifdef USE_POWER_PINS
     inout vccd1,
     inout vssd1,
@@ -99,7 +99,7 @@ wire ew_submit;
 wire ew_next_ready;
 
 // Pipeline stage 2 - EXECUTE
-execute #(.CORENO(CORENO)) execute(
+execute #(.CORENO(CORENO), .INT_VEC(INT_VEC)) execute(
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif
