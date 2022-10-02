@@ -4,6 +4,11 @@
 `define OUT_ADDR_W 24
 
 module dmmu (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
+
     input i_clk,
     input i_rst,
 
@@ -35,9 +40,22 @@ wire [`RW-1:0] sr_addr_idx = i_sr_addr-`SR_ADDR_OFF;
 wire addr_in_range = (i_sr_addr >= `SR_ADDR_OFF) && (i_sr_addr < `SR_ADDR_OFF+16);
 always @(posedge i_clk) begin
     if (i_rst) begin
-        for (integer i=0; i<16; i=i+1) begin
-            page_table[i] <= `PAGE_RES_SIZE'b0;
-        end
+        page_table[0] <= `PAGE_RES_SIZE'b0;
+        page_table[1] <= `PAGE_RES_SIZE'b0;
+        page_table[2] <= `PAGE_RES_SIZE'b0;
+        page_table[3] <= `PAGE_RES_SIZE'b0;
+        page_table[4] <= `PAGE_RES_SIZE'b0;
+        page_table[5] <= `PAGE_RES_SIZE'b0;
+        page_table[6] <= `PAGE_RES_SIZE'b0;
+        page_table[7] <= `PAGE_RES_SIZE'b0;
+        page_table[8] <= `PAGE_RES_SIZE'b0;
+        page_table[9] <= `PAGE_RES_SIZE'b0;
+        page_table[10] <= `PAGE_RES_SIZE'b0;
+        page_table[11] <= `PAGE_RES_SIZE'b0;
+        page_table[12] <= `PAGE_RES_SIZE'b0;
+        page_table[13] <= `PAGE_RES_SIZE'b0;
+        page_table[14] <= `PAGE_RES_SIZE'b0;
+        page_table[15] <= `PAGE_RES_SIZE'b0;
     end else if (i_sr_we & addr_in_range)
         page_table[sr_addr_idx[`PAGE_IDX_W-1:0]] <= i_sr_data[`PAGE_RES_SIZE-1:0];
 end
@@ -47,6 +65,6 @@ wire [`OUT_ADDR_W-1:0] page_disable_address = {`PAGE_DEFAULT_PREFIX, i_addr[`IN_
 wire [`OUT_ADDR_W-1:0] page_enable_address = {page_res, page_off};
 
 assign o_addr = c_pag_en ? page_enable_address : page_disable_address;
-assign o_cacheable = (o_addr >= `OUT_ADDR_W'h100000 && o_addr < `OUT_ADDR_W'h800000);
+assign o_cacheable = (o_addr >= `OUT_ADDR_W'h104008 && o_addr < `OUT_ADDR_W'h800000);
 
 endmodule

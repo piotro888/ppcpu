@@ -1,6 +1,11 @@
 `include "config.v"
 
 module alu (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
+
     input [`RW-1:0] i_l, i_r,
     output [`RW-1:0] o_out,
 
@@ -34,9 +39,9 @@ always @* begin
         `ALU_MODE_SHR:
             outc = {1'b0, i_l >> i_r};
         `ALU_MODE_MUL: // temporary
-            outc = {1'b0, i_l * i_r};
+            outc = {1'b0, 16'b0};
         `ALU_MODE_DIV: // temporary
-            outc = {1'b0, i_l / i_r};
+            outc = {1'b0, 16'b0};
         `ALU_MODE_ASHR:
             outc = {1'b0, (i_l >> i_r) | ({`RW{i_l[`RW-1]}} << (`RW-i_r))};
         `ALU_MODE_SEXT:

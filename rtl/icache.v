@@ -1,6 +1,11 @@
 `include "config.v"
 
 module icache (
+`ifdef USE_POWER_PINS
+    inout vccd1,	// User area 1 1.8V supply
+    inout vssd1,	// User area 1 digital ground
+`endif
+
     input i_clk,
     input i_rst,
 
@@ -16,19 +21,20 @@ module icache (
     output reg wb_stb,
     input [`RW-1:0] wb_i_dat,
     output [`RW-1:0]  wb_adr,
-    output reg wb_we,
+    output wb_we,
     input wb_ack,
     output [1:0] wb_sel,
     input wb_err
 );
 
 assign wb_sel = 2'b11;
+assign wb_we = 1'b0;
 
 `define TAG_SIZE 9
 `define LINE_SIZE 128
 // 9b tag + 128b line + 1b valid
 `define ENTRY_SIZE 138
-`define CACHE_ASSOC 4
+`define CACHE_ASSOC 1
 `define CACHE_ENTR_N 32
 `define CACHE_SETS_N 8
 `define CACHE_OFF_W 2
@@ -54,15 +60,13 @@ reg cache_read_valid;
 wire cache_write_valid = wb_cyc & wb_stb;
 reg prev_write_compl;
 
-genvar i;
-generate
-    for (i=0; i<`CACHE_ASSOC; i=i+1) begin : cache_mem
-        cache_mem #(.AW(`CACHE_IDX_WIDTH), .AS(`CACHE_IDXES), .DW(`ENTRY_SIZE)) mem (
-            .i_clk(i_clk), .i_rst(i_rst | mem_cache_flush), .i_addr((|cache_we) ? wire_index : read_index), .i_data(cache_mem_in),
-            .o_data(cache_out[i]), .i_we(cache_we[i]));
-        assign cache_hit[i] = (cache_out[i][`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE] == compare_tag) && cache_out[i][0]; 
-    end
-endgenerate
+icache_ram  mem (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst | mem_cache_flush), .i_addr((|cache_we) ? wire_index : read_index), .i_data(cache_mem_in),
+    .o_data(cache_out[0]), .i_we(cache_we[0]));
+ assign cache_hit[0] = (cache_out[0][`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE] == compare_tag) && cache_out[0][0]; 
 
 assign mem_ack = cache_ghit | mem_fetch_end;
 
@@ -150,8 +154,7 @@ wire [`LINE_SIZE-1:0] pre_assembled_line = {wb_i_dat, line_collect[111:0]};
 wire [`ENTRY_SIZE-1:0] cache_write_entry = {write_tag, pre_assembled_line, 1'b1};
 wire cache_we_en = mem_fetch_end & ~invalidate_cache_update & ~invalidate_bus_err_w;
 always @* begin
-    cache_we[3:0] = 4'b0;
-    cache_we[tx_cache_sel] = cache_we_en;
+    cache_we[0] = cache_we_en;
 end
 
 
@@ -173,12 +176,7 @@ reg [`ENTRY_SIZE-1:0] cache_hit_entry;
 wire [`ENTRY_SIZE-1:0] entry_out = (mem_fetch_end ? {`TAG_SIZE'b0, pre_assembled_line, 1'b0} : cache_hit_entry);
 
 always @* begin
-    case (cache_hit)
-        default: cache_hit_entry = cache_out[0];
-        4'b0010: cache_hit_entry = cache_out[1];
-        4'b0100: cache_hit_entry = cache_out[2];
-        4'b1000: cache_hit_entry = cache_out[3];
-    endcase
+    cache_hit_entry = cache_out[0];
 end
 
 wire [`CACHE_OFF_W-1:0] offset_out = (mem_fetch_end ? write_off : compare_off);
@@ -191,54 +189,6 @@ always @* begin
     endcase
 end
 
-reg [1:0] cache_sel;
-reg [1:0] tx_cache_sel, prev_cache_sel;
-always @* begin
-    if (~cache_out[0][0])
-        cache_sel = 2'b0;
-    else if (~cache_out[1][0])
-        cache_sel = 2'b1;
-    else if (~cache_out[2][0])
-        cache_sel = 2'b10;
-    else if (~cache_out[3][0])
-        cache_sel = 2'b11;
-    else
-        cache_sel = prev_cache_sel + 2'b1;
-end
-
-always @(posedge i_clk) begin
-    if (cache_miss & ~i_rst) begin
-        tx_cache_sel <= cache_sel;
-        prev_cache_sel <= tx_cache_sel;
-    end
-end
-
-endmodule
-
-module cache_mem #(parameter AW = 2, parameter AS = 4, parameter DW = 16)(
-    input i_clk,
-    input i_rst,
-
-    input [AW-1:0] i_addr,
-    input [DW-1:0] i_data,
-    output reg [DW-1:0] o_data,
-    input i_we
-);
-
-reg [DW-1:0] mem [AS-1:0];
-
-always @(posedge i_clk) begin
-    if (i_rst) begin
-        for (integer row = 0; row < AS; row = row+1) begin
-            mem[row][0] <= 1'b0;
-        end
-    end else begin
-        if(i_we)
-            mem[i_addr] <= i_data;
-        o_data <= mem[i_addr];
-    end
-end
-
 endmodule
 
 `undef TAG_SIZE
@@ -249,4 +199,5 @@ endmodule
 `undef CACHE_SETS_N
 `undef CACHE_OFF_W
 `undef CACHE_IDX_WIDTH
-`undef CACHE_IDXES 
+`undef CACHE_IDXES
+`undef SW

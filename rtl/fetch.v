@@ -3,6 +3,11 @@
 // Instruction fetch stage v2
 
 module fetch (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
+
     input i_clk,
     input i_rst,
 
@@ -18,7 +23,9 @@ module fetch (
     output reg [`I_SIZE-1:0] o_instr,
     output reg o_jmp_predict,
 
-    input [`RW-1:0] i_exec_pc
+    input [`RW-1:0] i_exec_pc,
+
+    output dbg_out
 );
 
 assign mem_addr = (pc_reset_override ? `RW'b0 : ((i_flush | pc_flush_override) ? i_exec_pc : pred_pc));
@@ -137,5 +144,7 @@ always @(posedge i_clk) begin
         out_buffer_valid <= 1'b0;
     end
 end
+
+assign dbg_out = instr_wait;
 
 endmodule

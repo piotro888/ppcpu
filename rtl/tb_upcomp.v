@@ -19,7 +19,7 @@ module tb_upcomp (
     output reg [`WB_SEL_BITS-1:0] wb_sel,
 
     input i_irq,
-    output [`RW-1:0] dbg_r0, dbg_pc
+    output [61:0] dbg_out
 );
 
 wire cw_clk;
@@ -28,6 +28,7 @@ wire cw_req;
 wire cw_dir;
 wire cw_ack;
 wire cw_err;
+wire cw_rst;
 
 top_cw top_cw (
     .i_clk(i_clk),
@@ -41,8 +42,14 @@ top_cw top_cw (
     .cw_ack(cw_ack),
     .cw_err(cw_err),
     .i_irq(i_irq),
+    .cw_rst(cw_rst),
 
-    .ic_split_clock(1'b1)
+    .dbg_in(6'b000000),
+    .dbg_out(dbg_out),
+
+    .la_cw_ovr(1'b0),
+    .la_cw_ack('b0),
+    .la_cw_io_i('b0)
 );
 
 wb_decomp wb_decomp (

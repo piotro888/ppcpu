@@ -1,6 +1,11 @@
 `include "config.v"
 
-module execute (
+module execute #(parameter CORENO = 0, INT_VEC = 1) (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
+
     input i_clk,
     input i_rst,
 
@@ -47,7 +52,13 @@ module execute (
     output [`RW-1:0] sr_bus_addr, sr_bus_data_o,
     output sr_bus_we,
     output reg o_icache_flush,
-    input i_mem_exception
+    input i_mem_exception,
+    input i_core_int,
+    input [`RW-1:0] i_core_int_sreg,
+
+    output [32:0] dbg_out,
+    input dbg_hold,
+    input [`REGNO_LOG-1:0] dbg_reg_sel
 );
 
 reg next_ready_delayed;
@@ -58,7 +69,7 @@ wire raw_hazard = ((c_used_operands[0] & o_reg_ie[c_l_reg_sel]) |
 
 wire i_invalidate = i_flush | irq;
 // hazard doesn't invalidate instructions, only holds it
-wire hold_req = raw_hazard;
+wire hold_req = raw_hazard | dbg_hold;
 
 wire i_valid = i_submit & ~i_invalidate;
 reg hold_valid;
@@ -71,7 +82,8 @@ assign o_ready = exec_submit | ~instr_valid;
 
 // At IRQ, current instruction (and state update) is invalidated and pc is saved to sr, to
 // continue execution from current instruction. Flush is requested on next cycle
-wire irq = (i_irq & irq_en) | prev_sys | trap_exception | i_mem_exception;
+wire irq = ((i_irq | i_core_int) & irq_en) | prev_sys | trap_exception | i_mem_exception;
+// core_int is masked as externel event to not interrupt irq handler
 
 always @(posedge i_clk) begin
     if(i_rst) begin
@@ -108,21 +120,38 @@ assign o_pc_update = exec_submit;
 assign o_exec_pc = pc_val;
 wire [`RW-1:0] sreg_in = reg_r_con;
 reg [`RW-1:0] sreg_out;
+wire [`RW-1:0] dbg_reg_out;
 
 // Submodules
-rf rf(.i_clk(i_clk), .i_rst(i_rst), .i_d(i_reg_data), .o_lout(reg_l_con),
+rf rf(
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_d(i_reg_data), .o_lout(reg_l_con),
     .o_rout(reg_r_con), .i_lout_sel(c_l_reg_sel), .i_rout_sel(c_r_reg_sel),
-    .i_ie(i_reg_ie), .i_gie(1'b1), .dbg_r0(dbg_r0));
+    .i_ie(i_reg_ie), .i_gie(1'b1), .dbg_r0(dbg_r0), .dbg_sel(dbg_reg_sel), .dbg_reg(dbg_reg_out));
 
-alu alu(.i_l(alu_l_bus), .i_r(alu_r_bus), .o_out(alu_bus), .i_mode(c_alu_mode), 
+alu alu(
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_l(alu_l_bus), .i_r(alu_r_bus), .o_out(alu_bus), .i_mode(c_alu_mode), 
     .o_flags(alu_flags_d), .i_carry(alu_flags_q[`ALU_FLAG_C] & c_alu_carry_en));
 
-pc pc(.i_clk(i_clk), .i_rst(i_rst), .i_bus(c_sreg_store | c_sreg_irt ? (c_sreg_irt ? sreg_out : sreg_in) : alu_bus),
+pc #(.INT_VEC(INT_VEC)) pc (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_bus(c_sreg_store | c_sreg_irt ? (c_sreg_irt ? sreg_out : sreg_in) : alu_bus),
     .i_c_pc_inc((c_pc_inc | (~jump_dec_en & jump_dec_valid)) & exec_submit), .i_c_pc_ie((c_pc_ie | (jump_dec_en & jump_dec_valid) | pc_write) & exec_submit),
     .o_pc(pc_val), .i_c_pc_irq(irq));
 
 // Cpu control registers
-register  #(.N(`ALU_FLAG_CNT)) alu_flag_reg (.i_clk(i_clk), .i_rst(i_rst), .i_d((alu_flags_sreg_ie ? sreg_in[`ALU_FLAG_CNT-1:0] : alu_flags_d)),
+register  #(.N(`ALU_FLAG_CNT)) alu_flag_reg (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_d((alu_flags_sreg_ie ? sreg_in[`ALU_FLAG_CNT-1:0] : alu_flags_d)),
     .o_d(alu_flags_q), .i_ie((c_alu_flags_ie | alu_flags_sreg_ie) & exec_submit));
 
 // JUMP DECODE
@@ -229,6 +258,8 @@ end
 `define SREG_IRQ_FLAGS `RW'b101
 `define SREG_SCRATCH `RW'b110
 `define SREG_CPUID `RW'b111
+`define SREG_COREID `RW'b1000
+`define SREG_MT_IRQ `RW'b1001 //,1010, 1011
 
 reg pc_sreg_ie, sreg_priv_control_ie, sreg_irq_pc_ie, alu_flags_sreg_ie, sreg_jtr_ie, sreg_scratch_ie;
 wire [`RW-1:0] sreg_priv_control_out, sreg_irq_pc_out, sreg_scratch_out;
@@ -256,14 +287,20 @@ always @* begin
             alu_flags_sreg_ie = c_sreg_store;
         end
         `SREG_IRQ_FLAGS: begin
-            sreg_out = {12'b0, sreg_irq_flags_out};
+            sreg_out = {11'b0, sreg_irq_flags_out};
         end
         `SREG_SCRATCH: begin
             sreg_out = sreg_scratch_out;
             sreg_scratch_ie = c_sreg_store;
         end
         `SREG_CPUID: begin
-            sreg_out = 16'b1111_0000_0011_0001;
+            sreg_out = 16'b1111_0000_0011_0010;
+        end
+        `SREG_COREID: begin
+            sreg_out = CORENO;
+        end
+        `SREG_MT_IRQ: begin // write is handled in upper_core
+            sreg_out = i_core_int_sreg;
         end
         default:
             sreg_out = 16'b0;
@@ -279,28 +316,53 @@ end
 
 
 wire [`RW-1:0] priv_in = (irq ? (sreg_priv_control_out & `RW'hfff9) : (c_sreg_irt ? (sreg_priv_control_out | `RW'h0004) : sreg_in)); // disable irq and paging flag on interrupt and re-enable on return
-register #(.RESET_VAL(`RW'b001)) sreg_priv_control (.i_clk(i_clk), .i_rst(i_rst), .i_d(priv_in), .o_d(sreg_priv_control_out),
+register #(.RESET_VAL(`RW'b001)) sreg_priv_control (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_d(priv_in), .o_d(sreg_priv_control_out),
     .i_ie((((sreg_priv_control_ie & sreg_priv_mode) | c_sreg_irt) & exec_submit) | irq));
 
 wire irq_en = sreg_priv_control_out[2], sreg_priv_mode = sreg_priv_control_out[0];
 assign o_c_data_page = sreg_priv_control_out[1];
 
-register sreg_irq_pc (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_pc_ie ? sreg_in : (i_mem_exception ? mem_stage_pc : pc_val)), .o_d(sreg_irq_pc_out), .i_ie(irq | (sreg_irq_pc_ie & exec_submit)));
+register sreg_irq_pc (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_pc_ie ? sreg_in : (i_mem_exception ? mem_stage_pc : pc_val)), .o_d(sreg_irq_pc_out), .i_ie(irq | (sreg_irq_pc_ie & exec_submit)));
 
 wire [1:0] sreg_jtr_buff_o, sreg_jtr_out;
 wire jtr_jump_en = (sreg_irq_pc_ie | jump_dec_valid | c_sreg_irt) & exec_submit;
 wire jtr_irqh_write = irq;
 wire [1:0] jtr_buff_in = (irq ? 2'b00 : sreg_in[1:0]);
 wire [1:0] jtr_in = (irq ? 2'b00 : sreg_jtr_buff_o);
-register  #(.RESET_VAL(2'b01), .N(2)) sreg_jtr_buff (.i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_buff_in), .o_d(sreg_jtr_buff_o), .i_ie(sreg_jtr_ie | jtr_irqh_write));
-register  #(.RESET_VAL(2'b01), .N(2)) sreg_jtr (.i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_in), .o_d(sreg_jtr_out), .i_ie(jtr_jump_en | jtr_irqh_write));
+register  #(.RESET_VAL(2'b01), .N(2)) sreg_jtr_buff (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_buff_in), .o_d(sreg_jtr_buff_o), .i_ie(sreg_jtr_ie | jtr_irqh_write));
+register  #(.RESET_VAL(2'b01), .N(2)) sreg_jtr (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_in), .o_d(sreg_jtr_out), .i_ie(jtr_jump_en | jtr_irqh_write));
 assign o_c_instr_page = sreg_jtr_out[0];
 wire trap_flag = sreg_jtr_out[1];
 
-register sreg_scratch (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_in), .o_d(sreg_scratch_out), .i_ie(sreg_scratch_ie & exec_submit));
+register sreg_scratch (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_in), .o_d(sreg_scratch_out), .i_ie(sreg_scratch_ie & exec_submit));
 
-wire [3:0] sreg_irq_flags_in = {i_mem_exception, trap_exception, prev_sys, (i_irq & irq_en)}, sreg_irq_flags_out;
-register #(.N(4)) sreg_irq_flags (.i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_flags_in), .o_d(sreg_irq_flags_out), .i_ie(irq));
+wire [4:0] sreg_irq_flags_in = {(i_core_int & irq_en), i_mem_exception, trap_exception, prev_sys, (i_irq & irq_en)};
+wire [4:0] sreg_irq_flags_out;
+register #(.N(5)) sreg_irq_flags (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_flags_in), .o_d(sreg_irq_flags_out), .i_ie(irq));
 
 wire immu_write = c_sreg_store & exec_submit & (sr_bus_addr >= `RW'h100 && sr_bus_addr < `RW'h100 + 16); // flush after write to mmu is executed
 wire flush_instr_mmu = (immu_write & o_c_instr_page) | ((jtr_in[0] ^ sreg_jtr_out[0]) & (jtr_jump_en | jtr_irqh_write));
@@ -311,8 +373,6 @@ assign sr_bus_addr = i_imm;
 assign sr_bus_we = c_sreg_store & exec_submit;
 assign sr_bus_data_o = sreg_in;
 
-endmodule
+assign dbg_out = {o_ready, pc_val, dbg_reg_out};
 
-`include "alu.v"
-`include "rf.v"
-`include "pc.v"
+endmodule

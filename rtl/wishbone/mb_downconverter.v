@@ -1,6 +1,11 @@
 `include "config.v"
 
 module mb_downconverter (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
+
     // 32b data width -> 16 data width 
     input i_clk,
     input i_rst,

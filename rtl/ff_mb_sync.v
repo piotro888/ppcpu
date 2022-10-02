@@ -1,4 +1,9 @@
 module ff_mb_sync #(parameter DATA_W = 1) (
+`ifdef USE_POWER_PINS
+    inout vccd1,
+    inout vssd1,
+`endif
+
     input src_clk,
     input dst_clk,
 
