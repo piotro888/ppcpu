@@ -5,7 +5,6 @@ module icache_ram (
 `endif
 
     input i_clk,
-    input i_rst,
 
     input [4:0] i_addr,
     input [137:0] i_data,
@@ -16,15 +15,9 @@ module icache_ram (
 reg [137:0] mem [31:0];
 
 always @(posedge i_clk) begin
-    if (i_rst) begin
-        for (integer row = 0; row < 32; row = row+1) begin
-            mem[row][0] <= 1'b0;
-        end
-    end else begin
-        if(i_we)
-            mem[i_addr] <= i_data;
-        o_data <= mem[i_addr];
-    end
+    if(i_we)
+        mem[i_addr] <= i_data;
+    o_data <= mem[i_addr];
 end
 
 endmodule

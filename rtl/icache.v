@@ -60,13 +60,25 @@ reg cache_read_valid;
 wire cache_write_valid = wb_cyc & wb_stb;
 reg prev_write_compl;
 
+wire [`CACHE_IDX_WIDTH-1:0] cache_addr = ((|cache_we) ? wire_index : read_index);
+
 icache_ram  mem (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif
-    .i_clk(i_clk), .i_rst(i_rst | mem_cache_flush), .i_addr((|cache_we) ? wire_index : read_index), .i_data(cache_mem_in),
-    .o_data(cache_out[0]), .i_we(cache_we[0]));
- assign cache_hit[0] = (cache_out[0][`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE] == compare_tag) && cache_out[0][0]; 
+    .i_clk(i_clk), .i_addr(cache_addr), .i_data(cache_mem_in),
+    .o_data(cache_out[0]), .i_we(cache_we[0])
+);
+assign cache_hit[0] = (cache_out[0][`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE] == compare_tag) && valid_bits[cache_addr]; 
+
+reg [`CACHE_ENTR_N-1:0] valid_bits;
+always @(posedge i_clk) begin
+    if (i_rst | mem_cache_flush) begin
+        valid_bits <= `CACHE_ENTR_N'b0;
+    end else if (cache_we[0]) begin
+        valid_bits[cache_addr] <= cache_mem_in[0];
+    end
+end
 
 assign mem_ack = cache_ghit | mem_fetch_end;
 
