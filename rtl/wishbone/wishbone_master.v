@@ -25,7 +25,7 @@ module wishbone_master (
     input wb_ack,
     input wb_err,
     input wb_rty,
-    output reg [`WB_SEL_BITS-1:0] wb_sel
+    output [`WB_SEL_BITS-1:0] wb_sel
 );
 
 assign wb_sel = 2'b11;

@@ -69,6 +69,8 @@ wire [`CACHE_IDX_WIDTH-1:0] cache_idx = mem_addr[7:2];
 wire [`CACHE_OFF_W-1:0] cache_offset = mem_addr[1:0];
 wire [`TAG_SIZE-1:0] cache_compare_tag = mem_addr[`WB_ADDR_W-1:8];
 
+`ifndef USE_OC_RAM
+
 dcache_ram mem_set_0 (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
@@ -81,6 +83,17 @@ dcache_ram mem_set_1 (
 `endif
     .i_clk(i_clk), .i_rst(i_rst), .i_addr(cache_idx), .i_data(cache_mem_in),
     .o_data(cache_out[1]), .i_we(cache_we[1]));
+
+`else
+
+ocram_dcache mem_set_0 (
+    .clock(i_clk),  .address(cache_idx), .data(cache_mem_in),
+    .q(cache_out[0]), .wren(cache_we[0]));
+ocram_dcache mem_set_1 (
+    .clock(i_clk),  .address(cache_idx), .data(cache_mem_in),
+    .q(cache_out[1]), .wren(cache_we[1]));
+
+`endif
 
 assign cache_hit[0] = (cache_out[0][`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE] == cache_compare_tag) && cache_out[0][`VALID_BIT]; 
 assign cache_hit[1] = (cache_out[1][`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE] == cache_compare_tag) && cache_out[1][`VALID_BIT]; 

@@ -125,7 +125,6 @@ wire fetch_wb_cyc, fetch_wb_stb, fetch_wb_we;
 wire fetch_wb_ack, fetch_wb_err;
 wire [`WB_DATA_W-1:0] fetch_wb_o_dat;
 wire [`WB_ADDR_W-1:0]  fetch_wb_adr;
-wire [`WB_ADDR_W-1:0]  fetch_wb_adr;
 wire [`WB_SEL_BITS-1:0] fetch_wb_sel;
 wire fetch_arb_sel;
 wire fetch_wb_4_burst, fetch_wb_8_burst;
@@ -178,7 +177,7 @@ upper_core_logic upper_core_logic (
     .data0_mem_addr_paged(data0_mem_addr_paged), .fetch0_wb_adr_paged(fetch0_wb_adr_paged), .data1_mem_addr_paged(data1_mem_addr_paged), .fetch1_wb_adr_paged(fetch1_wb_adr_paged),
     .sr0_bus_addr(sr_bus_addr0), .sr0_bus_data_o(sr_bus_data_o0), .sr1_bus_addr(sr_bus_addr1), .sr1_bus_data_o(sr_bus_data_o1),
     .sr0_bus_we(sr_bus_we0), .sr1_bus_we(sr_bus_we1), .cc0_instr_page(cc_instr_page0), .cc1_instr_page(cc_instr_page1), .cc0_data_page(cc_data_page0), .cc1_data_page(cc_data_page1), .data0_cacheable(data_cacheable0), .data1_cacheable(data_cacheable1),
-    .fetch0_wb_o_dat(fetch0_wb_o_dat), .fetch1_wb_o_dat(fetch0_wb_o_dat), .data_wb_8_burst(data_wb_8_burst), .fetch0_4_burst(fetch0_wb_4_burst), .fetch1_4_burst(fetch1_wb_4_burst), .fetch0_8_burst(fetch0_wb_8_burst), .fetch1_8_burst(fetch1_wb_8_burst),
+    .fetch0_wb_o_dat(fetch0_wb_o_dat), .fetch1_wb_o_dat(fetch1_wb_o_dat), .data_wb_8_burst(data_wb_8_burst), .fetch0_4_burst(fetch0_wb_4_burst), .fetch1_4_burst(fetch1_wb_4_burst), .fetch0_8_burst(fetch0_wb_8_burst), .fetch1_8_burst(fetch1_wb_8_burst),
     .c1_disable(c1_disable), .sr0_bus_data_i(sr0_bus_data_i), .sr1_bus_data_i(sr1_bus_data_i), .c0_disable(c0_disable), .c0_core_int(c0_core_int), .c1_core_int(c1_core_int),
     .c0_dbg(dbg_out_core0), .c1_dbg(dbg_out_core1), .dbg_out(dbg_out_core), .dbg_sel(dbg_in[4]), .i_irq(i_irq), .o_irq0(i_irq0), .o_irq1(i_irq1)
 );
@@ -196,5 +195,3 @@ wishbone_arbiter wb_arbiter (
 assign dbg_out = {wb_adr, wb_we, wb_stb, dbg_out_core};
 
 endmodule
-
-`include "wishbone/wishbone_arbiter.v"

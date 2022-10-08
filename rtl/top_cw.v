@@ -26,12 +26,17 @@ module top_cw (
     input i_irq,
     output cw_rst,
 
+`ifndef SOC
     output [61:0] dbg_out,
     input [5:0] dbg_in,
 
     input [`RW-1:0] la_cw_io_i,
     input la_cw_ack,
     input la_cw_ovr
+`else
+    output [`RW-1:0] dbg_r0,
+    output [`RW-1:0] dbg_pc
+`endif
 );
 
 wire ic_split_clock = dbg_in[4];
@@ -45,8 +50,6 @@ wire u_wb_we;
 wire u_wb_ack, u_wb_ack_cmp, u_wb_ack_clk;
 wire u_wb_err;
 wire [`WB_SEL_BITS-1:0] u_wb_sel;
-
-wire [`RW-1:0] dbg_r0, ignore_dbg_pc;
 
 upper_core upc (
 `ifdef USE_POWER_PINS
@@ -66,7 +69,7 @@ upper_core upc (
     .i_irq(irq_s),
     .wb_rty(1'b0),
     .dbg_r0(dbg_r0),
-    .dbg_pc(ignore_dbg_pc),
+    .dbg_pc(dbg_pc),
     .wb_4_burst(u_wb_4_burst),
     .wb_8_burst(u_wb_8_burst),
 
@@ -247,7 +250,16 @@ top_cw_logic top_cw_logic (
     .cw_ack(cw_ack)
 );
 
-endmodule
+`ifndef SOC
+wire [`RW-1:0] dbg_r0;
+wire [`RW-1:0] dbg_pc;
+`else
+wire [61:0] dbg_out;
+wire [5:0] dbg_in = 6'b0;
+wire [`RW-1:0] la_cw_io_i;
+wire la_cw_ack;
+wire la_cw_ovr = 1'b0;
+`endif
 
-`include "wishbone/wb_cross_clk.v"
-`include "wishbone/wb_compressor.v"
+
+endmodule

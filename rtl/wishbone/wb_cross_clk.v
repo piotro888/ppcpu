@@ -146,6 +146,7 @@ ff_mb_sync #(.DATA_W(`SM_SYNC_W)) s_m_sync (
 
 assign m_wb_i_dat = smsync1[17:2];
 assign m_wb_ack = msy_flag_ack; 
+assign m_wb_err = msy_flag_err; 
 
 wire msy_xor_ack = smsync1[0];
 wire msy_xor_err = smsync1[1];

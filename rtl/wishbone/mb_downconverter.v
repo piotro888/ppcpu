@@ -13,13 +13,13 @@ module mb_downconverter (
     input [`RW-1:0] u_req_addr,
     input u_req_active,
     output [`I_SIZE-1:0] u_req_data,
-    output reg u_req_data_valid,
+    output u_req_data_valid,
 
     output [`RW-1:0] d_req_addr,
-    output reg d_req_active,
+    output d_req_active,
     input [`RW-1:0] d_req_data,
     input d_req_data_valid,
-    output reg d_req_next
+    output d_req_next
 );
 
 wire [`RW-1:0] first_addr = {u_req_addr[`RW-2:0], 1'b0};

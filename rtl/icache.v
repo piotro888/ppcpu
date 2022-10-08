@@ -62,13 +62,25 @@ reg prev_write_compl;
 
 wire [`CACHE_IDX_WIDTH-1:0] cache_addr = ((|cache_we) ? wire_index : read_index);
 
-icache_ram  mem (
+`ifndef USE_OC_RAM
+
+icache_ram mem (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif
     .i_clk(i_clk), .i_addr(cache_addr), .i_data(cache_mem_in),
     .o_data(cache_out[0]), .i_we(cache_we[0])
 );
+
+`else
+
+ocram_icache mem (
+    .clock(i_clk), .address(cache_addr), .data(cache_mem_in),
+    .q(cache_out[0]), .wren(cache_we[0])
+);
+
+`endif
+
 assign cache_hit[0] = (cache_out[0][`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE] == compare_tag) && valid_bits[cache_addr]; 
 
 reg [`CACHE_ENTR_N-1:0] valid_bits;

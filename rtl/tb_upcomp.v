@@ -76,6 +76,3 @@ wb_decomp wb_decomp (
 assign wb_clk = cw_clk;
 
 endmodule
-
-`include "top_cw.v"
-`include "wishbone/wb_decomp.v"

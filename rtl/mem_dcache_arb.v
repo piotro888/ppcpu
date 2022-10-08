@@ -8,7 +8,7 @@ module mem_dcache_arb (
     input i_clk,
     input i_rst,
 
-    output reg  mem_req,
+    output mem_req,
     output reg mem_we,
     input mem_ack,
     output reg [`WB_ADDR_W-1:0] mem_addr,
@@ -20,23 +20,23 @@ module mem_dcache_arb (
 
     input mem0_req,
     input mem0_we,
-    output mem0_ack,
+    output reg mem0_ack,
     input [`WB_ADDR_W-1:0] mem0_addr,
     input [`RW-1:0] mem0_o_data,
     output reg [`RW-1:0] mem0_i_data,
     input [1:0] mem0_sel,
     input mem0_cache_enable,
-    output mem0_exception,
+    output reg mem0_exception,
 
     input mem1_req,
     input mem1_we,
-    output mem1_ack,
+    output reg mem1_ack,
     input [`WB_ADDR_W-1:0] mem1_addr,
     input [`RW-1:0] mem1_o_data,
     output reg [`RW-1:0] mem1_i_data,
     input [1:0] mem1_sel,
     input mem1_cache_enable,
-    output mem1_exception
+    output reg mem1_exception
 );
     
 wire request_term = mem_ack | mem_exception;
