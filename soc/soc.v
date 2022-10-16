@@ -21,11 +21,14 @@ module soc (
     
     output [3:0] pc_leds,
     output ser_clk,
-    output ser_data
+    output ser_data,
+
+    input uart_rx,
+    output uart_tx
 );
 
 reg por_n = 1'b0;
-reg [4:0] por_cnt = 4'b0;
+reg [10:0] por_cnt = 'b0;
 always @(posedge d_clk) begin
     por_cnt <= por_cnt + 'b1;
     if(&por_cnt)
@@ -46,7 +49,7 @@ wire [15:0] dbg_pc, dbg_r0;
 assign pc_leds = dbg_r0[3:0];
 
 reg [4:0] clk_div;
-wire d_clk = clk_div[2];
+wire d_clk = clk_div[0];
 wire d_rst = ~(i_rst & por_n);
 always @(posedge i_clk) begin
     clk_div <= clk_div + 5'b1;
@@ -122,7 +125,7 @@ always @(posedge cw_clk) begin
         sdram_req <= 1'b0;
     end else if (sdram_req_active & c_read_ready & ~wb_we) begin
         sdram_req_active <= 1'b0;
-    end else if ((wb_adr >= 24'h100000) & (wb_adr < 24'hffe000) & wb_cyc & wb_stb & ~sdram_req_active) begin
+    end else if ((wb_adr >= 24'h100004) & (wb_adr < 24'hffe000) & wb_cyc & wb_stb & ~sdram_req_active) begin
         sdram_req <= 1'b1;
         sdram_req_active <= 1'b1;
     end
@@ -164,8 +167,29 @@ soc_rom soc_rom (
     .out_data(rom_data)
 );
 
+wire [`WB_DATA_W-1:0] uart_wb_i_dat;
+wire uart_wb_ack;
+uart uart (
+    .i_clk(cw_clk),
+    .i_rst(d_rst),
+
+    .tx(uart_tx),
+    .rx(uart_rx),
+
+    .wb_cyc(wb_cyc),
+    .wb_stb(wb_stb & (wb_adr >= 24'h100000 && wb_adr <= 24'h100002)),
+    .wb_adr(wb_adr - 24'h100000),
+    .wb_we(wb_we),
+    .wb_i_dat(wb_o_dat),
+    .wb_o_dat(uart_wb_i_dat),
+    .wb_ack(uart_wb_ack)
+);
+
 always @(*) begin
-    if (wb_adr < 24'hffe000) begin
+    if (wb_adr >= 24'h100000 && wb_adr <= 24'h100002) begin
+        wb_i_dat = uart_wb_i_dat;
+        wb_ack = wb_cyc & wb_stb;
+    end else if (wb_adr < 24'hffe000) begin
         wb_i_dat = sdram_data_out;
         wb_ack = sdram_ack;
     end else begin
