@@ -45,7 +45,8 @@ assign wb_we = 1'b0;
 
 wire [`TAG_SIZE-1:0] compare_tag = cache_read_addr[15:7];
 wire [`TAG_SIZE-1:0] write_tag = cache_write_addr[15:7];
-wire [`CACHE_IDX_WIDTH-1:0] read_index = (submit_pending ?  submit_pending_addr[6:2] : mem_addr[6:2]);
+wire [`CACHE_IDX_WIDTH-1:0] mem_index = (submit_pending ?  submit_pending_addr[6:2] : mem_addr[6:2]);
+wire [`CACHE_IDX_WIDTH-1:0] compare_index = cache_read_addr[6:2];
 wire [`CACHE_IDX_WIDTH-1:0] wire_index = cache_write_addr[6:2];
 wire [`CACHE_OFF_W-1:0] compare_off = cache_read_addr[1:0];
 wire [`CACHE_OFF_W-1:0] write_off = cache_write_addr[1:0];
@@ -60,7 +61,7 @@ reg cache_read_valid;
 wire cache_write_valid = wb_cyc & wb_stb;
 reg prev_write_compl;
 
-wire [`CACHE_IDX_WIDTH-1:0] cache_addr = ((|cache_we) ? wire_index : read_index);
+wire [`CACHE_IDX_WIDTH-1:0] cache_addr = ((|cache_we) ? wire_index : mem_index);
 
 `ifndef USE_OC_RAM
 
@@ -81,7 +82,8 @@ ocram_icache mem (
 
 `endif
 
-assign cache_hit[0] = (cache_out[0][`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE] == compare_tag) && valid_bits[cache_addr]; 
+// we have to use valid bits from delayed index for data to arrive at the same time as memory
+assign cache_hit[0] = (cache_out[0][`ENTRY_SIZE-1:`ENTRY_SIZE-`TAG_SIZE] == compare_tag) && valid_bits[compare_index]; 
 
 reg [`CACHE_ENTR_N-1:0] valid_bits;
 always @(posedge i_clk) begin
