@@ -192,7 +192,7 @@ always @(posedge clk) begin
             dr_dq_oe <= 1'b1;
             state <= STATE_WAIT;
             wait_next_state <= STATE_IDLE;
-            wait_reg <= 16'd2;
+            wait_reg <= 16'd1;
         end
         STATE_REFR: begin
             ram_cmd <= CMD_AREFR;

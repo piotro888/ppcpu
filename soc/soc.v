@@ -46,7 +46,7 @@ wire cw_err;
 
 wire [15:0] dbg_pc, dbg_r0;
 //assign pc_leds = {wb_we, wb_ack, sdram_req, sdram_req_active};
-assign pc_leds = dbg_r0[3:0];
+assign pc_leds = dbg_pc[3:0];
 
 reg [4:0] clk_div;
 wire d_clk = clk_div[0];
@@ -159,7 +159,7 @@ sdram sdram (
     .dr_dq(dr_dq)
 );
 
-assign dr_clk = i_clk;
+assign dr_clk = ~i_clk; // ram controller depends on setting edges half cycle before ram
 
 wire [`RW-1:0] rom_data;
 soc_rom soc_rom (
