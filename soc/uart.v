@@ -46,28 +46,27 @@ reg [OVERSAMPLE_LOG:0] rx_os_cnt;
 reg [7:0] rx_result;
 reg [2:0] rx_res_bit;
 
-wire rx_submit = (rx_stop & rx);
+wire rx_submit = (rx_stop & (&(~rx_os_cnt)) & rx);
 
 always @(posedge uart_os_clk) begin
     if (i_rst) begin
         rx_active <= 1'b0;
-        rx_os_cnt <= 'b0; 
+        rx_os_cnt <= 'b0;
+        rx_stop <= 1'b0;
     end else begin 
         if (~rx_active & ~rx) begin
             rx_active <= 1'b1;
             rx_res_bit <= 1'b0;
             rx_os_cnt <= OVERSAMPLE + OVERSAMPLE/2 - 1;
-        end else if (rx_stop) begin
+        end else if (rx_stop & (&(~rx_os_cnt))) begin
             rx_active <= 1'b0;
             rx_stop <= 1'b0;
         end else if (rx_active & (&(~rx_os_cnt))) begin
-            rx_os_cnt <= OVERSAMPLE;
+            rx_os_cnt <= OVERSAMPLE-1;
             rx_result[rx_res_bit] <= rx;
             rx_res_bit <= rx_res_bit + 1'b1;
             rx_stop <= &(rx_res_bit);
-        end
-
-        if (rx_active)
+        end else if (rx_active)
             rx_os_cnt <= rx_os_cnt - 1'b1;
     end
 end
@@ -93,7 +92,7 @@ always @(posedge i_clk) begin
         rx_read_ptr <= 3'b0;
     end else begin
         rx_prev_data <= rx_write_ptr-rx_read_ptr;
-        if (wb_cyc & wb_stb & ~wb_we & wb_adr == 24'h1) begin
+        if (wb_cyc & wb_stb & ~wb_we & wb_adr == 24'h1 & rx_data_available) begin
             rx_read_ptr <= rx_read_ptr + 3'b1;
             rx_prev_data <= (rx_write_ptr-rx_read_ptr-3'b1);
         end
@@ -105,7 +104,7 @@ end
 reg [1:0] tx_state;
 wire tx_ready = (tx_state == 2'b0);
 wire tx_start = tx_data_avail;
-wire [7:0] tx_data = tx_fifo[tx_read_ptr];
+reg [7:0] tx_data;
 reg [2:0] tx_data_cnt;
 
 always @(posedge uart_clk) begin
@@ -137,6 +136,7 @@ always @(posedge uart_clk) begin
         tx_read_ptr <= 3'b0;
     end else if (tx_ready & tx_data_avail) begin
         tx_read_ptr <= tx_read_ptr + 3'b1;
+        tx_data <= tx_fifo[tx_read_ptr];
     end
 end
 
