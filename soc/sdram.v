@@ -183,7 +183,7 @@ always @(posedge clk) begin
         end
         STATE_WRITE: begin
             ram_cmd <= CMD_WRITE;
-            {dr_dqml, dr_dqmh} <= i_wr_mask;
+            {dr_dqmh, dr_dqml} <= i_wr_mask;
             dr_ba <= {i_addr[23:22]};
             dr_a[8:0] <= i_addr[8:0];
             dr_a[9] <= 1'b0; dr_a[12:11] <= 2'b0;

@@ -58,7 +58,7 @@ always @(posedge i_clk) begin
                     state <= `S_HDR_1;
                     l_wb_adr[`WB_ADDR_W-1:`RW] <= cw_io_i[`RW-1:8];
                     wb_we <= cw_io_i[3];
-                    wb_sel <= cw_io_i[1:0];
+                    wb_sel <= cw_io_i[2:1];
                     burst_end <= (~(|cw_io_i[7:4]) ? 3'd0 : (cw_io_i[4] ? 3'd7 : 3'd3));
                     burst_cnt <= `MAX_BRST_LOG'b0;
                     cw_ack <= 1'b1;
