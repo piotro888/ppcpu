@@ -171,6 +171,7 @@ wire [`WB_DATA_W-1:0] uart_wb_i_dat;
 wire uart_wb_ack;
 uart uart (
     .i_clk(cw_clk),
+    .i_full_clk(i_clk),
     .i_rst(d_rst),
 
     .tx(uart_tx),

@@ -91,7 +91,7 @@ load_data_mem:
         sto r0, r5, 0
 
         adi r5, r5, 2 
-        cmi r5, 0x100
+        cmi r5, 0x1000
         jne page_update_skip
 
             adi r3, r3, 1
@@ -101,8 +101,10 @@ load_data_mem:
         page_update_skip:
         adi r7, r7, -2 
         cmi r7, 0
-        jgt load_loop
-    jmp main_loop
+
+        jca main_loop  ; jgt unsigned
+        jeq main_loop
+        jmp load_loop
 
 dump_page:
     jal r6, getc16

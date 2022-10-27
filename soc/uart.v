@@ -1,5 +1,6 @@
 module uart (
     input i_clk,
+    input i_full_clk,
     input i_rst,
 
     input rx,
@@ -9,13 +10,14 @@ module uart (
     output wb_ack,
     input [23:0] wb_adr,
     input [15:0] wb_i_dat,
-    output reg [15:0] wb_o_dat
+    output reg [15:0] wb_o_dat,
+    //output  dbg_trig
 );
 
 localparam BAUD_RATE = 115200;
 localparam OVERSAMPLE = 8;
 localparam OVERSAMPLE_LOG = 3;
-localparam CLOCK_FREQ = 25_000_000;
+localparam CLOCK_FREQ = 50_000_000;
 localparam UART_CLOCK_DIV = CLOCK_FREQ/(BAUD_RATE*2);
 localparam OSMPL_CLOCK_DIV = CLOCK_FREQ/(BAUD_RATE*OVERSAMPLE*2);
 localparam RX_BUFF_SIZE = 8;
@@ -25,11 +27,11 @@ reg uart_os_clk = 1'b0;
 reg [5:0] uart_os_clk_cnt = 6'b0;
 reg uart_clk = 1'b0;
 reg [9:0] uart_clk_cnt = 10'b0;
-always @(posedge i_clk) begin
+always @(posedge i_full_clk) begin
     uart_os_clk_cnt <= uart_os_clk_cnt + 6'b1;
     uart_clk_cnt <= uart_clk_cnt + 6'b1;
 
-    if (uart_os_clk_cnt == OSMPL_CLOCK_DIV) begin
+    if (uart_os_clk_cnt == 27) begin
         uart_os_clk_cnt <= 6'b0;
         uart_os_clk <= ~uart_os_clk;
     end
@@ -41,35 +43,79 @@ always @(posedge i_clk) begin
 end
 
 // RECEIVE
-reg rx_active, rx_stop;
-reg [OVERSAMPLE_LOG:0] rx_os_cnt;
+// reg rx_active = 1'b0, rx_stop = 1'b0;
+// reg [OVERSAMPLE_LOG:0] rx_os_cnt;
 reg [7:0] rx_result;
 reg [2:0] rx_res_bit;
 
-wire rx_submit = (rx_stop & (&(~rx_os_cnt)) & rx);
+//wire rx_submit = (rx_stop & (rx_os_cnt == 0));
+wire rx_submit = (sub_clk_cnt == 4'b0111) && (state == 4'b1001);
+//assign dbg_trig = rx_submit & ~rx;
 
+// I DONT KNOW WHY but this code from old cpu works just fine,
+// but preetier new code that seems to behave in the same way misses the stop bits. WHY???
+reg [3:0] state = 4'b0;
+reg [3:0] sub_clk_cnt = 4'b0;
+//reg r1_trig = 1'b0;
 always @(posedge uart_os_clk) begin
-    if (i_rst) begin
-        rx_active <= 1'b0;
-        rx_os_cnt <= 'b0;
-        rx_stop <= 1'b0;
-    end else begin 
-        if (~rx_active & ~rx) begin
-            rx_active <= 1'b1;
-            rx_res_bit <= 1'b0;
-            rx_os_cnt <= OVERSAMPLE + OVERSAMPLE/2 - 1;
-        end else if (rx_stop & (&(~rx_os_cnt))) begin
-            rx_active <= 1'b0;
-            rx_stop <= 1'b0;
-        end else if (rx_active & (&(~rx_os_cnt))) begin
-            rx_os_cnt <= OVERSAMPLE-1;
-            rx_result[rx_res_bit] <= rx;
-            rx_res_bit <= rx_res_bit + 1'b1;
-            rx_stop <= &(rx_res_bit);
-        end else if (rx_active)
-            rx_os_cnt <= rx_os_cnt - 1'b1;
-    end
+    case (state)
+        4'b0: begin
+            // if start bit
+            if(rx == 1'b0) begin
+                state <= 1'b1;
+            end
+        end
+        4'b1001: begin
+            if(sub_clk_cnt == 4'b0111) begin
+                sub_clk_cnt <= 4'b0;
+                state <= 4'b0;
+                //r1_trig <= ~r1_trig;
+            end else begin
+                sub_clk_cnt <= sub_clk_cnt+4'b1;
+            end
+        end
+        default: begin // default read bit
+            if((state != 4'b1 && sub_clk_cnt == 4'b0111) || sub_clk_cnt == 4'b1010) begin //delay first clock by one and half
+                rx_result[state-4'b1] <= rx;
+                state <= state+4'b1;
+                sub_clk_cnt <= 4'b0;
+                //r1_trig <= ~r1_trig;
+            end else begin
+                sub_clk_cnt <= sub_clk_cnt+4'b1;
+            end
+        end
+    endcase
 end
+
+// reg r2_trig = 1'b0;
+// always @(posedge uart_os_clk) begin
+//     if (i_rst) begin
+//         rx_active <= 1'b0;
+//         rx_os_cnt <= 'b0;
+//         rx_stop <= 1'b0;
+//     end else begin 
+//         if (~rx_active & ~rx) begin
+//             rx_active <= 1'b1;
+//             rx_res_bit <= 'b0;
+//             rx_os_cnt <= 4'b1010;
+//         end else if (rx_stop & (rx_os_cnt == 0)) begin
+//             rx_active <= 1'b0;
+//             rx_stop <= 1'b0;
+//             r2_trig <= ~r2_trig;
+//             //dbg_trig <= ~dbg_trig;
+//         end else if (rx_active & ~rx_stop & (rx_os_cnt == 0)) begin
+//             rx_os_cnt <= 4'b0111;
+//             r2_trig <= ~r2_trig;
+//             //rx_result[rx_res_bit] <= rx;
+//             rx_res_bit <= rx_res_bit + 1'b1;
+//             rx_stop <= (rx_res_bit == 3'b111);
+//             //dbg_trig <= ~dbg_trig;
+//         end else if (rx_active) begin
+//             rx_os_cnt <= rx_os_cnt - 1'b1;
+//         end
+//     end
+// end
+
 
 reg [7:0] rx_fifo [RX_BUFF_SIZE-1:0];
 reg [2:0] rx_write_ptr, rx_read_ptr;
