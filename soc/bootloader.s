@@ -85,10 +85,13 @@ load_data_mem:
 
     mov r0, r5
     jal r6, putc
+
+    ldi r1, 0 ; checksum
     
     load_loop:
         jal r6, getc16
         sto r0, r5, 0
+        add r1, r1, r0s
 
         adi r5, r5, 2 
         cmi r5, 0x1000
@@ -102,9 +105,15 @@ load_data_mem:
         adi r7, r7, -2 
         cmi r7, 0
 
-        jca main_loop  ; jgt unsigned
-        jeq main_loop
+        jca load_loop_end  ; jgt unsigned
+        jeq load_loop_end
         jmp load_loop
+    load_loop_end:
+    mov r0, r1
+    jal r6, putc
+    sri r0, r0, 8
+    jal r6, putc
+    jmp main_loop
 
 dump_page:
     jal r6, getc16
@@ -143,8 +152,8 @@ getc16:
 
 getc:
     getc_wait_ready:
-        ldd r1, 0x1000
-        cai r1, 0x1
+        ldd r0, 0x1000
+        cai r0, 0x1
         jeq getc_wait_ready
     ldd r0, 0x1002
     srs r6, 0

@@ -10,8 +10,7 @@ module uart (
     output wb_ack,
     input [23:0] wb_adr,
     input [15:0] wb_i_dat,
-    output reg [15:0] wb_o_dat,
-    //output  dbg_trig
+    output reg [15:0] wb_o_dat
 );
 
 localparam BAUD_RATE = 115200;

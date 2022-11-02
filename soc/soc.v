@@ -28,7 +28,7 @@ module soc (
 );
 
 reg por_n = 1'b0;
-reg [10:0] por_cnt = 'b0;
+reg [15:0] por_cnt = 'b0;
 always @(posedge d_clk) begin
     por_cnt <= por_cnt + 'b1;
     if(&por_cnt)
@@ -45,8 +45,8 @@ wire cw_ack;
 wire cw_err;
 
 wire [15:0] dbg_pc, dbg_r0;
-//assign pc_leds = {wb_we, wb_ack, sdram_req, sdram_req_active};
-assign pc_leds = dbg_pc[3:0];
+assign pc_leds = {wb_we, wb_ack, sdram_req, sdram_req_active};
+//assign pc_leds = dbg_pc[3:0];
 
 reg [4:0] clk_div;
 wire d_clk = clk_div[0];
@@ -65,7 +65,7 @@ top_cw top_cw (
     .cw_dir(cw_dir),
     .cw_ack(cw_ack),
     .cw_err(cw_err),
-    .i_irq(i_irq),
+    .i_irq(m_irq),
     .dbg_pc(dbg_pc),
     .dbg_r0(dbg_r0)
 );
@@ -102,6 +102,26 @@ wb_decomp wb_decomp (
     .wb_sel(wb_sel)
 );
 
+/*
+ * Address map
+ */
+
+localparam UART_BASE =  24'h100000;
+localparam UART_END =   24'h100002;
+
+localparam TIMER_BASE = 24'h100004;
+localparam TIMER_END =  24'h100006;
+
+localparam IRQC_BASE =  24'h100008;
+localparam IRQC_END =   24'h100010;
+
+localparam SDRAM_BASE = 24'h100100; 
+localparam SDRAM_END =  24'hffdfff;
+
+localparam ROM_BASE =   24'hffe000;
+localparam ROM_END =    24'hffffff;
+
+
 wire [`RW-1:0] sdram_data_out;
 assign sdram_data_out = data_out[15:0];
 
@@ -125,7 +145,7 @@ always @(posedge cw_clk) begin
         sdram_req <= 1'b0;
     end else if (sdram_req_active & c_read_ready & ~wb_we) begin
         sdram_req_active <= 1'b0;
-    end else if ((wb_adr >= 24'h100004) & (wb_adr < 24'hffe000) & wb_cyc & wb_stb & ~sdram_req_active) begin
+    end else if ((wb_adr >= SDRAM_BASE) & (wb_adr <= SDRAM_END) & wb_cyc & wb_stb & ~sdram_req_active) begin
         sdram_req <= 1'b1;
         sdram_req_active <= 1'b1;
     end
@@ -178,24 +198,68 @@ uart uart (
     .rx(uart_rx),
 
     .wb_cyc(wb_cyc),
-    .wb_stb(wb_stb & (wb_adr >= 24'h100000 && wb_adr <= 24'h100002)),
-    .wb_adr(wb_adr - 24'h100000),
+    .wb_stb(wb_stb & ((wb_adr >= UART_BASE) && (wb_adr <= UART_END))),
+    .wb_adr(wb_adr - UART_BASE),
     .wb_we(wb_we),
     .wb_i_dat(wb_o_dat),
     .wb_o_dat(uart_wb_i_dat),
     .wb_ack(uart_wb_ack)
 );
 
+wire timer_irq, timer_wb_ack;
+wire [`WB_DATA_W-1:0] timer_wb_i_dat;
+timer timer (
+    .i_clk(cw_clk),
+    .i_rst(d_rst),
+    
+    .irq(timer_irq),
+
+    .wb_cyc(wb_cyc),
+    .wb_stb(wb_stb & (wb_adr >= TIMER_BASE && wb_adr <= TIMER_END)),
+    .wb_adr(wb_adr - TIMER_END),
+    .wb_we(wb_we),
+    .wb_i_dat(wb_o_dat),
+    .wb_o_dat(timer_wb_i_dat),
+    .wb_ack(timer_wb_ack)
+);
+
+wire m_irq, irqc_wb_ack;
+wire [`WB_DATA_W-1:0] irqc_wb_i_dat;
+irq_ctrl irq_ctrl (
+    .i_clk(i_clk),
+    .i_rst(d_rst),
+
+    .o_irq(m_irq),
+    .i_irq({15'b0, timer_irq}),
+
+    .wb_cyc(wb_cyc),
+    .wb_stb(wb_stb & (wb_adr >= IRQC_BASE && wb_adr <= IRQC_END)),
+    .wb_adr(wb_adr - IRQC_BASE),
+    .wb_we(wb_we),
+    .wb_i_dat(wb_o_dat),
+    .wb_o_dat(irqc_wb_i_dat),
+    .wb_ack(irqc_wb_ack)
+);
+
 always @(*) begin
-    if (wb_adr >= 24'h100000 && wb_adr <= 24'h100002) begin
+    if ((wb_adr >= UART_BASE) && (wb_adr <= UART_END)) begin
         wb_i_dat = uart_wb_i_dat;
         wb_ack = wb_cyc & wb_stb;
-    end else if (wb_adr < 24'hffe000) begin
+    end else if ((wb_adr >= TIMER_BASE) && (wb_adr <= TIMER_END)) begin
+        wb_i_dat = timer_wb_i_dat;
+        wb_ack = timer_wb_ack;
+    end else if ((wb_adr >= IRQC_BASE) && (wb_adr <= IRQC_END)) begin
+        wb_i_dat = irqc_wb_i_dat;
+        wb_ack = irqc_wb_ack;
+    end else if ((wb_adr >= SDRAM_BASE) && (wb_adr <= SDRAM_END)) begin
         wb_i_dat = sdram_data_out;
         wb_ack = sdram_ack;
-    end else begin
+    end else if ((wb_adr >= ROM_BASE) && (wb_adr <= ROM_END)) begin
         wb_i_dat = rom_data;
         wb_ack = wb_cyc & wb_stb;
+    end else begin
+        wb_i_dat = 16'b0;
+        wb_ack = 1'b0;
     end
 end
 
