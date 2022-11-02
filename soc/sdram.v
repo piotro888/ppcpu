@@ -98,9 +98,9 @@ always @(posedge clk) begin
         {dr_dqml, dr_dqmh} <= 2'b00; dr_dq_oe <= 1'b0; dr_a <= 13'b0; dr_ba <= 2'b0;
     //end
 
-    prev_srclk <= srclk;
-    if((prev_srclk ^ srclk) & srclk) // THIS WAS THE ISSUE!!!! READ_REDY WAS NOT RESET!!!
-      c_read_ready <= 1'b0;
+    //prev_srclk <= srclk;
+    // if((prev_srclk ^ srclk) & srclk)
+    c_read_ready <= 1'b0;
     
     case (state)
         STATE_INIT_BEGIN: begin
@@ -142,27 +142,27 @@ always @(posedge clk) begin
         end
         STATE_IDLE: begin
            // c_busy <= 1'b1; //default if not staying in idle
-            if(pulse_c_read) begin
+            if(c_read_req & ~c_busy/*pulse_c_read*/) begin
                 ram_cmd <= CMD_ACTIVE; //CHECK IF NOT ACTIVATED ALREADY
                 //STORE PROG AND DATA IN DIFFERENT BANKS TO NOT PRECHARGE EVERY COMMAND
                 //8192 rows x 512 col x 16 bit x 4 banks
                 // 13 b     +  9 b    + 16 b   + 2b
-                i_addr <= c_r_addr;
+                i_addr <= c_addr;
                 i_data_in <= c_data_in;
-                dr_ba <= {c_r_addr[23:22]}; // lower max ram addr and set banks to msb???
-                dr_a <= c_r_addr[21:9];
+                dr_ba <= {c_addr[23:22]}; // lower max ram addr and set banks to msb???
+                dr_a <= c_addr[21:9];
                 state <= STATE_WAIT;
                 wait_next_state <= STATE_READ;
                 wait_reg <= 16'd1;
                 c_busy <= 1'b1;
                 sync_x_read_done <= sync_x_read_done^1;
-            end else if(pulse_c_write) begin
+            end else if(c_write_req & ~c_busy/*pulse_c_write*/) begin
                 ram_cmd <= CMD_ACTIVE;
-                i_addr <= c_w_addr;
+                i_addr <= c_addr;
                 i_data_in <= c_data_in;
                 i_wr_mask <= ~c_addr_sel;
-                dr_ba <= {c_w_addr[23:22]};
-                dr_a <= c_w_addr[21:9];
+                dr_ba <= {c_addr[23:22]};
+                dr_a <= c_addr[21:9];
                 state <= STATE_WAIT;
                 wait_next_state <= STATE_WRITE;
                 wait_reg <= 16'd1;

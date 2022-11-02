@@ -140,7 +140,7 @@ end
 
 wire c_busy, c_read_ready, c_cack;
 sdram sdram (
-    .clk(i_clk),
+    .clk(cw_clk),
     .srclk(cw_clk),
     .c_addr(wb_adr),
     .c_data_in(wb_o_dat),
@@ -159,7 +159,7 @@ sdram sdram (
     .dr_dq(dr_dq)
 );
 
-assign dr_clk = ~i_clk; // ram controller depends on setting edges half cycle before ram
+assign dr_clk = ~cw_clk;//i_clk; // ram controller depends on setting edges half cycle before ram
 
 wire [`RW-1:0] rom_data;
 soc_rom soc_rom (
