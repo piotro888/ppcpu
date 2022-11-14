@@ -42,7 +42,7 @@ module mem_dcache_arb (
 wire request_term = mem_ack | mem_exception;
 
 reg select, transfer_active;
-reg req0_pending, req1_pending; // TODO: assign out req
+reg req0_pending, req1_pending;
 
 wire req_w = mem0_req | mem1_req | req0_pending | req1_pending;
 
@@ -54,7 +54,7 @@ always @(posedge i_clk) begin
     if (i_rst) begin
         select <= 1'b0;
         transfer_active <= 1'b0;
-    end else if (req_start) begin
+    end else if (req_start & ~request_term) begin
         select <= req_sel;
         transfer_active <= 1'b1;
     end else if (transfer_active & request_term) begin
