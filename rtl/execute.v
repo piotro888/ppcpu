@@ -39,7 +39,7 @@ module execute #(parameter CORENO = 0, INT_VEC = 1) (
 
     // Pipeline next stage
     output reg [`RW-1:0] o_data,
-    output reg[`RW-1:0] o_addr,
+    output reg [`RW-1:0] o_addr,
     output reg [`REGNO-1:0] o_reg_ie,
     output reg o_mem_access, o_mem_we, o_mem_width,
     output reg o_submit,
@@ -48,7 +48,8 @@ module execute #(parameter CORENO = 0, INT_VEC = 1) (
     input [`RW-1:0] i_reg_data,
 
     input i_irq,
-    output o_c_instr_page, o_c_data_page,
+    output o_c_instr_page,
+    output reg o_c_data_page,
     output [`RW-1:0] sr_bus_addr, sr_bus_data_o,
     output sr_bus_we,
     output reg o_icache_flush,
@@ -324,7 +325,7 @@ register #(.RESET_VAL(`RW'b001)) sreg_priv_control (
     .i_ie((((sreg_priv_control_ie & sreg_priv_mode) | c_sreg_irt) & exec_submit) | irq));
 
 wire irq_en = sreg_priv_control_out[2], sreg_priv_mode = sreg_priv_control_out[0];
-assign o_c_data_page = sreg_priv_control_out[1];
+wire sreg_data_page = sreg_priv_control_out[1];
 
 register sreg_irq_pc (
 `ifdef USE_POWER_PINS
@@ -368,6 +369,16 @@ wire immu_write = c_sreg_store & exec_submit & (sr_bus_addr >= `RW'h100 && sr_bu
 wire flush_instr_mmu = (immu_write & o_c_instr_page) | ((jtr_in[0] ^ sreg_jtr_out[0]) & (jtr_jump_en | jtr_irqh_write));
 always @(posedge i_clk)
     o_icache_flush <= flush_instr_mmu & ~i_rst;
+
+// Delays disable of data paging in case of interrupt. MEMWB stage is still executing and changing
+// address during request would break commited result. In other cases special handling is not needed,
+// becaue sregs are updated only when next stage is ready
+always @(posedge i_clk) begin
+    if (i_rst)
+        o_c_data_page <= 1'b0;
+    else if (i_next_ready)
+        o_c_data_page <= sreg_data_page;
+end
 
 assign sr_bus_addr = i_imm;
 assign sr_bus_we = c_sreg_store & exec_submit;
