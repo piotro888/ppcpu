@@ -24,15 +24,15 @@ reg [15:0] irq_mask;
 
 always @(posedge i_clk) begin
     if (i_rst) begin
-        irq_active <= 16'b0;
-        irq_mask <= 16'h0000;
+        irq_active = 16'b0;
+        irq_mask = 16'h0000;
     end else begin
         if (wb_cyc & wb_stb & wb_we & wb_adr == 24'b1)
-            irq_active <= irq_active & ~wb_i_dat;
+            irq_active = irq_active & ~wb_i_dat;
         if (wb_cyc & wb_stb & wb_we & wb_adr == 24'b10)
-            irq_mask <= wb_i_dat;
+            irq_mask = wb_i_dat;
         
-        irq_active <= irq_active | ((prev_i_irq ^ i_irq) & i_irq);
+        irq_active = irq_active | ((prev_i_irq ^ i_irq) & i_irq);
     end
 end
 
@@ -45,6 +45,6 @@ always @(posedge i_clk) begin
 end
 
 assign wb_ack = wb_cyc & wb_stb;
-assign wb_o_dat = (wb_adr == 24'b10 ? irq_mask : irq_active); 
+assign wb_o_dat = (wb_adr == 24'b10 ? irq_mask : irq_active & irq_mask); 
 
 endmodule
