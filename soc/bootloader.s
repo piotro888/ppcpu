@@ -1,7 +1,7 @@
 start:
     ldi r0, 0b011 ; enable data paging
     srs r0, 1
-    ldi r0, 0x200
+    ldi r0, 0x004
     srs r0, 0x201 ; map page 1 to device address
 
     ; ldi r0, 0x1000

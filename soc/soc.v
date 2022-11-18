@@ -106,16 +106,16 @@ wb_decomp wb_decomp (
  * Address map
  */
 
-localparam UART_BASE =  24'h100000;
-localparam UART_END =   24'h100002;
+localparam UART_BASE =  24'h002000;
+localparam UART_END =   24'h002003;
 
-localparam TIMER_BASE = 24'h100004;
-localparam TIMER_END =  24'h100006;
+localparam TIMER_BASE = 24'h002008;
+localparam TIMER_END =  24'h00200a;
 
-localparam IRQC_BASE =  24'h100008;
-localparam IRQC_END =   24'h100010;
+localparam IRQC_BASE =  24'h00200c;
+localparam IRQC_END =   24'h00200e;
 
-localparam SDRAM_BASE = 24'h100100; 
+localparam SDRAM_BASE = 24'h100000; 
 localparam SDRAM_END =  24'hffdfff;
 
 localparam ROM_BASE =   24'hffe000;

@@ -65,6 +65,6 @@ wire [`OUT_ADDR_W-1:0] page_disable_address = {`PAGE_DEFAULT_PREFIX, i_addr[`IN_
 wire [`OUT_ADDR_W-1:0] page_enable_address = {page_res, page_off};
 
 assign o_addr = c_pag_en ? page_enable_address : page_disable_address;
-assign o_cacheable = (o_addr >= `OUT_ADDR_W'h104008 && o_addr < `OUT_ADDR_W'h800000);
+assign o_cacheable = (o_addr >= `OUT_ADDR_W'h100000 && o_addr < `OUT_ADDR_W'h800000);
 
 endmodule
