@@ -216,7 +216,7 @@ timer timer (
 
     .wb_cyc(wb_cyc),
     .wb_stb(wb_stb & (wb_adr >= TIMER_BASE && wb_adr <= TIMER_END)),
-    .wb_adr(wb_adr - TIMER_END),
+    .wb_adr(wb_adr - TIMER_BASE),
     .wb_we(wb_we),
     .wb_i_dat(wb_o_dat),
     .wb_o_dat(timer_wb_i_dat),

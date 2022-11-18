@@ -31,10 +31,9 @@ always @(posedge i_clk) begin
         if(pre_div_cnt >= (1<<clk_div) - 16'b1) begin
             timer_cnt <= timer_cnt + 16'b1;
             pre_div_cnt <= 16'b0;
-        end
 
-        if(timer_cnt == 16'hffff) begin
-            timer_cnt <= reset_val;
+            if(timer_cnt == 16'hffff)
+                timer_cnt <= reset_val;
         end
     end
 end
