@@ -24,7 +24,12 @@ module soc (
     output ser_data,
 
     input uart_rx,
-    output uart_tx
+    output uart_tx,
+
+    output spi_sck,
+    output spi_mosi,
+    input spi_miso,
+    output [1:0] spi_ss
 );
 
 reg por_n = 1'b0;
@@ -45,8 +50,15 @@ wire cw_ack;
 wire cw_err;
 
 wire [15:0] dbg_pc, dbg_r0;
-assign pc_leds = {wb_we, wb_ack, sdram_req, sdram_req_active};
+//assign pc_leds = {wb_we, wb_ack, sdram_req, sdram_req_active};
 //assign pc_leds = dbg_pc[3:0];
+assign pc_leds = regled;
+reg regled;
+reg prev_irq;
+always @(posedge d_clk) begin
+    prev_irq <= timer_irq;
+    regled <= regled ^ (timer_irq ^ prev_irq && timer_irq == 1'b1);
+end
 
 reg [4:0] clk_div;
 wire d_clk = clk_div[0];
@@ -114,6 +126,9 @@ localparam TIMER_END =  24'h00200a;
 
 localparam IRQC_BASE =  24'h00200c;
 localparam IRQC_END =   24'h00200e;
+
+localparam SPI_BASE =  24'h002010;
+localparam SPI_END =   24'h002014;
 
 localparam SDRAM_BASE = 24'h100000; 
 localparam SDRAM_END =  24'hffdfff;
@@ -226,7 +241,7 @@ timer timer (
 wire m_irq, irqc_wb_ack;
 wire [`WB_DATA_W-1:0] irqc_wb_i_dat;
 irq_ctrl irq_ctrl (
-    .i_clk(i_clk),
+    .i_clk(cw_clk),
     .i_rst(d_rst),
 
     .o_irq(m_irq),
@@ -241,6 +256,26 @@ irq_ctrl irq_ctrl (
     .wb_ack(irqc_wb_ack)
 );
 
+wire spi_wb_ack;
+wire [`WB_DATA_W-1:0] spi_wb_i_dat;
+spi spi (
+    .i_clk(cw_clk),
+    .i_rst(d_rst),
+
+    .spi_sck(spi_sck),
+    .spi_mosi(spi_mosi),
+    .spi_miso(spi_miso),
+    .spi_ss(spi_ss),
+
+    .wb_cyc(wb_cyc),
+    .wb_stb(wb_stb & (wb_adr >= SPI_BASE && wb_adr <= SPI_END)),
+    .wb_adr(wb_adr - SPI_BASE),
+    .wb_we(wb_we),
+    .wb_i_dat(wb_o_dat),
+    .wb_o_dat(spi_wb_i_dat),
+    .wb_ack(spi_wb_ack)
+);
+
 always @(*) begin
     if ((wb_adr >= UART_BASE) && (wb_adr <= UART_END)) begin
         wb_i_dat = uart_wb_i_dat;
@@ -251,6 +286,9 @@ always @(*) begin
     end else if ((wb_adr >= IRQC_BASE) && (wb_adr <= IRQC_END)) begin
         wb_i_dat = irqc_wb_i_dat;
         wb_ack = irqc_wb_ack;
+    end else if ((wb_adr >= SPI_BASE) && (wb_adr <= SPI_END)) begin
+        wb_i_dat = spi_wb_i_dat;
+        wb_ack = spi_wb_ack;
     end else if ((wb_adr >= SDRAM_BASE) && (wb_adr <= SDRAM_END)) begin
         wb_i_dat = sdram_data_out;
         wb_ack = sdram_ack;
