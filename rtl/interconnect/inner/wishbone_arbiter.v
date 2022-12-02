@@ -13,7 +13,6 @@ module wishbone_arbiter (
     input i_wb1_cyc,
 
     output o_wb_cyc,
-    output reg o_sel_sig,
 
     input wb0_stb,
     input [`WB_ADDR_W-1:0] wb0_adr,
@@ -42,6 +41,8 @@ module wishbone_arbiter (
     input owb_err,
     output reg owb_8_burst, owb_4_burst
 );
+
+reg o_sel_sig;
 
 wire bus_req = i_wb0_cyc | i_wb1_cyc;
 

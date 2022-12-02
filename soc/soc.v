@@ -42,13 +42,6 @@ always @(posedge d_clk) begin
         por_n <= 1'b0;
 end
 
-wire cw_clk;
-wire [`RW-1:0] cw_io_i, cw_io_o;
-wire cw_req;
-wire cw_dir;
-wire cw_ack;
-wire cw_err;
-
 wire [15:0] dbg_pc, dbg_r0;
 //assign pc_leds = {wb_we, wb_ack, sdram_req, sdram_req_active};
 //assign pc_leds = dbg_pc[3:0];
@@ -67,20 +60,56 @@ always @(posedge i_clk) begin
     clk_div <= clk_div + 5'b1;
 end
 
-top_cw top_cw (
-    .i_clk(d_clk),
-    .i_rst(d_rst),
-    .cw_clk(cw_clk),
-    .cw_io_i(cw_io_i),
-    .cw_io_o(cw_io_o),
-    .cw_req(cw_req),
-    .cw_dir(cw_dir),
-    .cw_ack(cw_ack),
-    .cw_err(cw_err),
-    .i_irq(m_irq),
-    .dbg_pc(dbg_pc),
-    .dbg_r0(dbg_r0)
+`define MPRJ_IO_PADS 38
+wire [`MPRJ_IO_PADS-1:0] m_io_in;
+wire [`MPRJ_IO_PADS-1:0] m_io_out;
+wire [`MPRJ_IO_PADS-1:0] m_io_oeb;
+
+top top (
+    .m_io_in(m_io_in),
+    .m_io_out(m_io_out),
+    .m_io_oeb(m_io_oeb),
+    .mgt_wb_clk_i(d_clk),
+    .mgt_wb_rst_i(d_rst),
+    .mgt_wb_cyc_i(1'b0),
+    .mgt_wb_stb_i(1'b0),
+    .la_oenb({128{1'b1}}),
+    .mgt_wb_we_i(1'b0),
+    .mgt_wb_dat_i('b0),
+    .mgt_wb_sel_i('b0),
+    .mgt_wb_adr_i('b0),
+    .la_data_in('b0),
+    .mgt_wb_ack_o(ignored_wb_ack),
+    .mgt_wb_dat_o(ignored_wb_dat_o),
+    .la_data_out(ignored_data_out),
+    .irq(ignored_irq)
 );
+
+wire [31:0] ignored_wb_dat_o;
+wire ignored_wb_ack;
+wire [127:0] ignored_data_out;
+wire [2:0] ignored_irq;
+
+// pins to cw bus
+wire [`RW-1:0] cw_io_i;
+wire [`RW-1:0] cw_io_o;
+wire cw_req;
+wire cw_dir;
+wire cw_ack;
+wire cw_err;
+wire cw_clk;
+wire cw_rst;
+
+assign cw_req = m_io_out[0];
+assign cw_dir = m_io_out[1];
+assign cw_io_o = m_io_out[17:2];
+assign m_io_in[17:2] = cw_io_i;
+assign m_io_in[18] = cw_ack;
+assign m_io_in[19] = cw_err;
+assign cw_clk = m_io_out[20];
+assign cw_rst = m_io_out[21];
+assign m_io_in[22] = m_irq;
+assign m_io_in[23] = 1'b0; // split clock
 
 wire wb_cyc;
 wire wb_stb;

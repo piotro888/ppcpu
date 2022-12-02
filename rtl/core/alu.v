@@ -39,7 +39,7 @@ always @* begin
         `ALU_MODE_SHR:
             outc = {1'b0, i_l >> i_r};
         `ALU_MODE_MUL: // temporary
-            outc = {1'b0, 16'b0};
+            outc = {1'b0, i_l*i_r};//16'b0};
         `ALU_MODE_DIV: // temporary
             outc = {1'b0, 16'b0};
         `ALU_MODE_ASHR:

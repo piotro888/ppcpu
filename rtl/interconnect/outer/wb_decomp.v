@@ -121,3 +121,7 @@ always @(posedge i_clk) begin
 end
 
 endmodule
+
+`undef S_DATA_R
+`undef S_DATA_W
+`undef SW

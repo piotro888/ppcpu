@@ -280,3 +280,12 @@ always @* begin
 end
 
 endmodule
+
+`undef SW
+`undef TAG_SIZE
+`undef LINE_SIZE
+`undef ENTRY_SIZE
+`undef CACHE_ASSOC
+`undef CACHE_ENTR_N
+`undef CACHE_IDX_WIDTH
+`undef CACHE_IDXES

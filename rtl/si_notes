@@ -1,0 +1,6 @@
+allow using internal flash in place of rom (config via external pin) qspi passthrough programming mode
+access auxilary caravel sram as internal memory
+few gpio pins by sreg???
+it says it can be accessed via wishbone so why not?
+none of that could be used.....
+so best we can do is small internal memory that can be programmed from that internal mgmt core
