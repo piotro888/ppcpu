@@ -80,17 +80,25 @@ assign m_io_out[21] = cw_rst; // reset out
 wire ext_irq = m_io_in[22];
 
 wire cs_split_clock = m_io_in[23];
+wire core_diable = m_io_in[24];
+wire embed_mode = m_io_in[25];
+
+assign spi_clk = m_io_in[26];
+assign spi_mosi = m_io_in[27];
+assign m_io_out[28] = spi_miso; 
 
 assign m_io_oeb[1:0] = 2'b0;
 assign m_io_oeb[17:2] = {16{cw_dir}}; // try to invert
 assign m_io_oeb[19:18] = 2'b11;
 assign m_io_oeb[21:20] = 2'b00;
-assign m_io_oeb[23:22] = 2'b11;
-assign m_io_oeb[`MPRJ_IO_PADS-1:24] = {`MPRJ_IO_PADS-24{1'b1}}; 
+assign m_io_oeb[25:22] = 4'b1111;
+assign m_io_oeb[27:26] = 2'b11;
+assign m_io_oeb[28] = 1'b0;
+assign m_io_oeb[`MPRJ_IO_PADS-1:29] = {`MPRJ_IO_PADS-29{1'b1}}; 
 
 // CLOCKING
 `define CLK_DIV_ADDR `WB_ADDR_W'h001001
-wire clk_div_write = (inner_wb_cyc & inner_wb_ack & inner_wb_we & (inner_wb_adr == `CLK_DIV_ADDR));
+wire clk_div_write = (m_wb_cyc & m_wb_ack & m_wb_we & (m_wb_adr == `CLK_DIV_ADDR));
 // TODO: ackkkkkkkkkkk
 clk_div clk_div (
 `ifdef USE_POWER_PINS
@@ -99,7 +107,7 @@ clk_div clk_div (
     .i_clk(soc_clock),
     .i_rst(core_reset),
     .o_clk(cw_clk),
-    .div(inner_wb_o_dat[3:0]),
+    .div(m_wb_o_dat[3:0]),
     .div_we(clk_div_write),
     .clock_sel(cs_split_clock)
 );
@@ -118,8 +126,8 @@ wire cwclk_wb_err = cw_mux_wb_err;
 wire cwclk_wb_8_burst, cwclk_wb_4_burst;
 
 // CROSS_CLK OUPUT SIGNALS FROM M_WB SIDE FOR MUXING
-wire [`WB_DATA_W-1:0] inner_wb_i_dat_cross;
-wire inner_wb_ack_cross, inner_wb_err_cross;
+wire [`WB_DATA_W-1:0] m_wb_i_dat_cross;
+wire m_wb_ack_cross, m_wb_err_cross;
 
 wb_cross_clk wb_cross_clk (
 `ifdef USE_POWER_PINS
@@ -130,17 +138,17 @@ wb_cross_clk wb_cross_clk (
     .m_rst(core_reset),
     .s_rst(cw_rst),
 
-    .m_wb_cyc(inner_wb_cyc),
-    .m_wb_stb(inner_wb_stb),
-    .m_wb_o_dat(inner_wb_o_dat),
-    .m_wb_i_dat(inner_wb_i_dat_cross),
-    .m_wb_adr(inner_wb_adr),
-    .m_wb_we(inner_wb_we),
-    .m_wb_ack(inner_wb_ack_cross),
-    .m_wb_err(inner_wb_err_cross),
-    .m_wb_sel(inner_wb_sel),
-    .m_wb_4_burst(inner_wb_4_burst),
-    .m_wb_8_burst(inner_wb_8_burst),
+    .m_wb_cyc(m_wb_cyc),
+    .m_wb_stb(m_wb_stb),
+    .m_wb_o_dat(m_wb_o_dat),
+    .m_wb_i_dat(m_wb_i_dat_cross),
+    .m_wb_adr(m_wb_adr),
+    .m_wb_we(m_wb_we),
+    .m_wb_ack(m_wb_ack_cross),
+    .m_wb_err(m_wb_err_cross),
+    .m_wb_sel(m_wb_sel),
+    .m_wb_4_burst(m_wb_4_burst),
+    .m_wb_8_burst(m_wb_8_burst),
 
     .s_wb_cyc(cwclk_wb_cyc),
     .s_wb_stb(cwclk_wb_stb),
@@ -168,17 +176,17 @@ wire cw_mux_wb_ack;
 wire cw_mux_wb_err;
 wire cw_mux_wb_8_burst, cw_mux_wb_4_burst;
 
-assign cw_mux_wb_cyc = (cs_split_clock ? cwclk_wb_cyc : inner_wb_cyc);
-assign cw_mux_wb_stb = (cs_split_clock ? cwclk_wb_stb : inner_wb_stb);
-assign cw_mux_wb_o_dat = (cs_split_clock ? cwclk_wb_o_dat : inner_wb_o_dat);
-assign cw_mux_wb_adr = (cs_split_clock ? cwclk_wb_adr : inner_wb_adr);
-assign cw_mux_wb_we = (cs_split_clock ? cwclk_wb_we : inner_wb_we);
-assign cw_mux_wb_sel = (cs_split_clock ? cwclk_wb_sel : inner_wb_sel);
-assign cw_mux_wb_8_burst = (cs_split_clock ? cwclk_wb_8_burst : inner_wb_8_burst);
-assign cw_mux_wb_4_burst = (cs_split_clock ? cwclk_wb_4_burst : inner_wb_4_burst);
-assign inner_wb_ack = (cs_split_clock ? inner_wb_ack_cross : cw_mux_wb_ack);
-assign inner_wb_err = (cs_split_clock ? inner_wb_err_cross  : cw_mux_wb_err);
-assign inner_wb_i_dat = (cs_split_clock ? inner_wb_i_dat_cross  : cw_mux_wb_i_dat);
+assign cw_mux_wb_cyc = (cs_split_clock ? cwclk_wb_cyc : m_wb_cyc);
+assign cw_mux_wb_stb = (cs_split_clock ? cwclk_wb_stb : m_wb_stb);
+assign cw_mux_wb_o_dat = (cs_split_clock ? cwclk_wb_o_dat : m_wb_o_dat);
+assign cw_mux_wb_adr = (cs_split_clock ? cwclk_wb_adr : m_wb_adr);
+assign cw_mux_wb_we = (cs_split_clock ? cwclk_wb_we : m_wb_we);
+assign cw_mux_wb_sel = (cs_split_clock ? cwclk_wb_sel : m_wb_sel);
+assign cw_mux_wb_8_burst = (cs_split_clock ? cwclk_wb_8_burst : m_wb_8_burst);
+assign cw_mux_wb_4_burst = (cs_split_clock ? cwclk_wb_4_burst : m_wb_4_burst);
+assign m_wb_ack = (cs_split_clock ? m_wb_ack_cross : cw_mux_wb_ack);
+assign m_wb_err = (cs_split_clock ? m_wb_err_cross  : cw_mux_wb_err);
+assign m_wb_i_dat = (cs_split_clock ? m_wb_i_dat_cross  : cw_mux_wb_i_dat);
 
 
 // CW BUS CONVERTER
@@ -208,6 +216,96 @@ wb_compressor wb_compressor (
     .wb_sel(cw_mux_wb_sel),
     .wb_4_burst(cw_mux_wb_4_burst),
     .wb_8_burst(cw_mux_wb_8_burst)
+);
+
+// EXT SPI WISHBONE MASTER
+wire spi_wb_cyc;
+wire spi_wb_stb;
+wire [`WB_ADDR_W-1:0] spi_wb_adr;
+wire spi_wb_we;
+wire [`WB_SEL_BITS-1:0] spi_wb_sel;
+wire [`WB_DATA_W-1:0] spi_wb_o_dat;
+wire [`WB_DATA_W-1:0] spi_wb_i_dat;
+wire spi_wb_ack;
+wire spi_wb_err;
+wire spi_wb_8_burst=1'b0, spi_wb_4_burst=1'b0;
+
+wire spi_clk;
+wire spi_mosi;
+wire spi_miso;
+
+sspi sspi (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(core_clock),
+    .i_rst(core_reset),
+
+    .spi_clk(spi_clk),
+    .spi_mosi(spi_mosi),
+    .spi_miso(spi_miso),
+
+    .wb_cyc(spi_wb_cyc),
+    .wb_stb(spi_wb_stb),
+    .wb_o_dat(spi_wb_o_dat),
+    .wb_i_dat(spi_wb_i_dat),
+    .wb_adr(spi_wb_adr),
+    .wb_we(spi_wb_we),
+    .wb_ack(spi_wb_ack),
+    .wb_err(spi_wb_err),
+    .wb_sel(spi_wb_sel)
+);
+
+// WISHBONE ARBITTER INNER BUS, EXT SPI BUS
+wire m_wb_cyc, m_wb_stb;
+wire m_wb_we;
+wire m_wb_ack, m_wb_err;
+wire [`WB_ADDR_W-1:0]  m_wb_adr;
+wire [`WB_DATA_W-1:0] m_wb_o_dat, m_wb_i_dat;
+wire [`WB_SEL_BITS-1:0] m_wb_sel;
+wire m_wb_4_burst, m_wb_8_burst;
+
+assign spi_wb_i_dat = m_wb_i_dat;
+assign inner_wb_i_dat = m_wb_i_dat; 
+
+wishbone_arbiter m_arbiter (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(core_clock), .i_rst(core_reset),
+
+    .o_wb_cyc(m_wb_cyc),
+    .owb_stb(m_wb_stb),
+    .owb_we(m_wb_we),
+    .owb_ack(m_wb_ack),
+    .owb_adr(m_wb_adr),
+    .owb_sel(m_wb_sel),
+    .owb_err(m_wb_err),
+    .owb_o_dat(m_wb_o_dat),
+    .owb_4_burst(m_wb_4_burst),
+    .owb_8_burst(m_wb_8_burst),
+
+    .i_wb0_cyc(spi_wb_cyc),
+    .wb0_stb(spi_wb_stb),
+    .wb0_we(spi_wb_we),
+    .wb0_ack(spi_wb_ack),
+    .wb0_adr(spi_wb_adr),
+    .wb0_sel(spi_wb_sel),
+    .wb0_err(spi_wb_err),
+    .wb0_o_dat(spi_wb_o_dat),
+    .wb0_4_burst(spi_wb_4_burst),
+    .wb0_8_burst(spi_wb_8_burst),
+
+    .i_wb1_cyc(inner_wb_cyc),
+    .wb1_stb(inner_wb_stb),
+    .wb1_we(inner_wb_we),
+    .wb1_ack(inner_wb_ack),
+    .wb1_adr(inner_wb_adr),
+    .wb1_sel(inner_wb_sel),
+    .wb1_err(inner_wb_err),
+    .wb1_o_dat(inner_wb_o_dat),
+    .wb1_4_burst(inner_wb_4_burst),
+    .wb1_8_burst(inner_wb_8_burst)
 );
 
 // SYNCHRONIZERS
