@@ -81,7 +81,7 @@ always @(posedge i_clk) begin
             wb_adr <= req_addr;
             wb_o_dat <= req_data;
             
-            if (wb_ack | wb_err) begin
+            if ((wb_ack | wb_err) & wb_cyc) begin
                 state <= STATE_WB_RESP;
                 bit_cnt <= 5'b0;
 
@@ -100,7 +100,7 @@ always @(posedge i_clk) begin
             wb_we <= 1'b0;
             wb_adr <= req_addr;
 
-            if (wb_ack | wb_err) begin
+            if ((wb_ack | wb_err) & wb_cyc) begin
                 state <= STATE_READ_DAT;
                 bit_cnt <= 5'b0;
 

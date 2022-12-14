@@ -71,7 +71,14 @@ interconnect_outer interconnect_outer (
     .inner_wb_sel(inner_wb_sel),
     .inner_wb_4_burst(inner_wb_4_burst),
     .inner_wb_8_burst(inner_wb_8_burst),
-    .inner_ext_irq(inner_ext_irq)
+    .inner_ext_irq(inner_ext_irq),
+    .inner_embed_mode(inner_embed_mode),
+    .inner_disable(inner_disable),
+    .iram_clk(iram_clk),
+    .iram_addr(iram_addr),
+    .iram_i_data(iram_i_data),
+    .iram_o_data(iram_o_data),
+    .iram_we(iram_we)
 );
 
 wire inner_wb_cyc, inner_wb_stb;
@@ -83,6 +90,8 @@ wire inner_wb_ack, inner_wb_err;
 wire [`WB_SEL_BITS-1:0] inner_wb_sel;
 wire inner_wb_4_burst, inner_wb_8_burst;
 wire inner_ext_irq;
+wire inner_embed_mode;
+wire inner_disable;
 
 /*
  * LOWER INTERCONNECT
@@ -104,6 +113,7 @@ interconnect_inner interconnect_inner (
     .inner_wb_4_burst(inner_wb_4_burst),
     .inner_wb_8_burst(inner_wb_8_burst),
     .inner_ext_irq(inner_ext_irq),
+    .inner_embed_mode(inner_embed_mode),
     .c0_clk(c0_clk),
     .c0_rst(c0_rst),
     .c0_disable(c0_disable),
@@ -214,7 +224,8 @@ interconnect_inner interconnect_inner (
     .dcache_wb_sel(dcache_wb_sel),
     .dcache_wb_4_burst(dcache_wb_4_burst),
     .dcache_wb_ack(dcache_wb_ack),
-    .dcache_wb_err(dcache_wb_err)
+    .dcache_wb_err(dcache_wb_err),
+    .inner_disable(inner_disable)
 );
 
 // CORES
@@ -355,6 +366,22 @@ icache icache_1 (
 `endif
     .i_clk(ic1_clk), .i_rst(ic1_rst), .mem_req(ic1_mem_req), .mem_addr(ic1_mem_addr), .mem_data(ic1_mem_data), .mem_ack(ic1_mem_ack), .mem_ppl_submit(ic1_mem_ppl_submit),
     .wb_cyc(ic1_wb_cyc), .wb_stb(ic1_wb_stb), .wb_we(ic1_wb_we), .wb_ack(ic1_wb_ack), .wb_i_dat(ic1_wb_i_dat), .wb_adr(ic1_wb_adr), .wb_sel(ic1_wb_sel), .mem_cache_flush(ic1_mem_cache_flush), .wb_err(ic1_wb_err)
+);
+
+// Internal ram
+wire iram_clk;
+wire [8:0] iram_addr;
+wire [`RW-1:0] iram_i_data, iram_o_data;
+wire iram_we;
+int_ram int_ram (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(iram_clk),
+    .i_addr(iram_addr),
+    .i_data(iram_i_data),
+    .o_data(iram_o_data),
+    .i_we(iram_we)
 );
 
 endmodule

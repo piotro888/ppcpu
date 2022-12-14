@@ -25,6 +25,8 @@ module interconnect_inner (
     output [`WB_SEL_BITS-1:0] inner_wb_sel,
     output inner_wb_4_burst, inner_wb_8_burst,
     input inner_ext_irq,
+    input inner_embed_mode,
+    input inner_disable,
 
     // CORE 0
     output c0_clk,
@@ -162,7 +164,7 @@ immu immu_0 (
     .i_clk(core_clock), .i_rst(core_reset), 
     .i_addr(ic0_wb_adr), .o_addr(ic0_wb_adr_paged),
     .i_sr_addr(c0_sr_bus_addr), .i_sr_data(c0_sr_bus_data_o), .i_sr_we(c0_sr_bus_we),
-    .c_pag_en(c0_o_c_instr_page)
+    .c_pag_en(c0_o_c_instr_page & ~inner_embed_mode)
 );
 
 assign ic1_clk = core_clock;
@@ -182,7 +184,7 @@ immu immu_1 (
     .i_clk(core_clock), .i_rst(core_reset), 
     .i_addr(ic1_wb_adr), .o_addr(ic1_wb_adr_paged),
     .i_sr_addr(c1_sr_bus_addr), .i_sr_data(c1_sr_bus_data_o), .i_sr_we(c1_sr_bus_we),
-    .c_pag_en(c1_o_c_instr_page)
+    .c_pag_en(c1_o_c_instr_page & ~inner_embed_mode)
 );
 
 
@@ -329,6 +331,9 @@ wishbone_arbiter inner_wb_arbiter (
 
 assign c0_i_irq = inner_ext_irq;
 assign c1_i_irq = 1'b0;
+wire c0_sc_disable, c1_sc_disable;
+assign c0_disable = c0_sc_disable | inner_disable;
+assign c1_disable = c1_sc_disable | inner_disable;
 
 intercore_sregs icore_sregs (
     .i_clk(core_clock),
@@ -344,9 +349,9 @@ intercore_sregs icore_sregs (
     .c1_sr_bus_data_i(c1_i_core_int_sreg),
     .c1_sr_bus_we(c1_sr_bus_we),
 
-    .c0_disable(c0_disable),
+    .c0_disable(c0_sc_disable),
     .c0_core_int(c0_i_mc_core_int),
-    .c1_disable(c1_disable),
+    .c1_disable(c1_sc_disable),
     .c1_core_int(c1_i_mc_core_int)
 );
     

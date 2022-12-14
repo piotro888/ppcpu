@@ -42,7 +42,16 @@ module interconnect_outer (
     output inner_wb_ack, inner_wb_err,
     input [`WB_SEL_BITS-1:0] inner_wb_sel,
     input inner_wb_4_burst, inner_wb_8_burst,
-    output inner_ext_irq
+    output inner_ext_irq,
+    output inner_embed_mode,
+    output inner_disable,
+
+    // Internal ram
+    output iram_clk,
+    output [8:0] iram_addr,
+    output [`RW-1:0] iram_i_data,
+    input  [`RW-1:0] iram_o_data,
+    output iram_we
 );
 
 wire soc_clock = mgt_wb_clk_i;
@@ -80,7 +89,7 @@ assign m_io_out[21] = cw_rst; // reset out
 wire ext_irq = m_io_in[22];
 
 wire cs_split_clock = m_io_in[23];
-wire core_diable = m_io_in[24];
+wire core_disable = m_io_in[24];
 wire embed_mode = m_io_in[25];
 
 assign spi_clk = m_io_in[26];
@@ -96,10 +105,12 @@ assign m_io_oeb[27:26] = 2'b11;
 assign m_io_oeb[28] = 1'b0;
 assign m_io_oeb[`MPRJ_IO_PADS-1:29] = {`MPRJ_IO_PADS-29{1'b1}}; 
 
+assign inner_embed_mode = embed_mode;
+assign inner_disable = core_disable;
+
 // CLOCKING
 `define CLK_DIV_ADDR `WB_ADDR_W'h001001
-wire clk_div_write = (m_wb_cyc & m_wb_ack & m_wb_we & (m_wb_adr == `CLK_DIV_ADDR));
-// TODO: ackkkkkkkkkkk
+wire clk_div_write = (m_wb_cyc & m_wb_ack & m_wb_we & wb_tsel_clk);
 clk_div clk_div (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
@@ -139,7 +150,7 @@ wb_cross_clk wb_cross_clk (
     .s_rst(cw_rst),
 
     .m_wb_cyc(m_wb_cyc),
-    .m_wb_stb(m_wb_stb),
+    .m_wb_stb(m_wb_stb & wb_tsel_cw),
     .m_wb_o_dat(m_wb_o_dat),
     .m_wb_i_dat(m_wb_i_dat_cross),
     .m_wb_adr(m_wb_adr),
@@ -175,6 +186,9 @@ wire[`WB_DATA_W-1:0] cw_mux_wb_i_dat;
 wire cw_mux_wb_ack;
 wire cw_mux_wb_err;
 wire cw_mux_wb_8_burst, cw_mux_wb_4_burst;
+wire cw_out_wb_ack;
+wire cw_out_wb_err;
+wire [`RW-1:0] cw_out_wb_i_dat;
 
 assign cw_mux_wb_cyc = (cs_split_clock ? cwclk_wb_cyc : m_wb_cyc);
 assign cw_mux_wb_stb = (cs_split_clock ? cwclk_wb_stb : m_wb_stb);
@@ -184,9 +198,9 @@ assign cw_mux_wb_we = (cs_split_clock ? cwclk_wb_we : m_wb_we);
 assign cw_mux_wb_sel = (cs_split_clock ? cwclk_wb_sel : m_wb_sel);
 assign cw_mux_wb_8_burst = (cs_split_clock ? cwclk_wb_8_burst : m_wb_8_burst);
 assign cw_mux_wb_4_burst = (cs_split_clock ? cwclk_wb_4_burst : m_wb_4_burst);
-assign m_wb_ack = (cs_split_clock ? m_wb_ack_cross : cw_mux_wb_ack);
-assign m_wb_err = (cs_split_clock ? m_wb_err_cross  : cw_mux_wb_err);
-assign m_wb_i_dat = (cs_split_clock ? m_wb_i_dat_cross  : cw_mux_wb_i_dat);
+assign cw_out_wb_ack = (cs_split_clock ? m_wb_ack_cross : cw_mux_wb_ack);
+assign cw_out_wb_err = (cs_split_clock ? m_wb_err_cross  : cw_mux_wb_err);
+assign cw_out_wb_i_dat = (cs_split_clock ? m_wb_i_dat_cross  : cw_mux_wb_i_dat);
 
 
 // CW BUS CONVERTER
@@ -206,7 +220,7 @@ wb_compressor wb_compressor (
     .cw_err(cw_err),
 
     .wb_cyc(cw_mux_wb_cyc),
-    .wb_stb(cw_mux_wb_stb),
+    .wb_stb(cw_mux_wb_stb & wb_tsel_cw),
     .wb_o_dat(cw_mux_wb_o_dat),
     .wb_i_dat(cw_mux_wb_i_dat),
     .wb_adr(cw_mux_wb_adr),
@@ -259,11 +273,12 @@ sspi sspi (
 // WISHBONE ARBITTER INNER BUS, EXT SPI BUS
 wire m_wb_cyc, m_wb_stb;
 wire m_wb_we;
-wire m_wb_ack, m_wb_err;
 wire [`WB_ADDR_W-1:0]  m_wb_adr;
-wire [`WB_DATA_W-1:0] m_wb_o_dat, m_wb_i_dat;
+wire [`WB_DATA_W-1:0] m_wb_o_dat;
 wire [`WB_SEL_BITS-1:0] m_wb_sel;
 wire m_wb_4_burst, m_wb_8_burst;
+reg m_wb_ack, m_wb_err;
+reg [`WB_DATA_W-1:0] m_wb_i_dat;
 
 assign spi_wb_i_dat = m_wb_i_dat;
 assign inner_wb_i_dat = m_wb_i_dat; 
@@ -307,6 +322,52 @@ wishbone_arbiter m_arbiter (
     .wb1_4_burst(inner_wb_4_burst),
     .wb1_8_burst(inner_wb_8_burst)
 );
+
+// INTERNAL RAM (for easier tesing in embed mode)
+wire [`RW-1:0] iram_wb_i_dat;
+
+assign iram_clk = core_clock;
+assign iram_addr = m_wb_adr[8:0];
+assign iram_i_data = m_wb_o_dat;
+assign iram_wb_i_dat = iram_o_data;
+assign iram_we = m_wb_cyc & m_wb_stb & m_wb_we & wb_tsel_iram;
+
+reg iram_wb_ack;
+always @(posedge core_clock) begin
+    if (core_reset) iram_wb_ack <= 1'b0;
+    else iram_wb_ack <= m_wb_cyc & m_wb_stb & wb_tsel_iram & ~m_wb_ack; // 1 cyc delay
+end
+
+// WISHBONE TARGET SELECT
+`define NE_INTMEM_BEGIN 24'h7ffe00
+`define E_PROG_START    24'h800000
+`define E_MEM_START     24'h100000
+`define INTMEM_SIZE     24'h200
+wire wb_tsel_cw = (~embed_mode && (m_wb_adr != `CLK_DIV_ADDR) && ((m_wb_adr < `NE_INTMEM_BEGIN) || (m_wb_adr >= `NE_INTMEM_BEGIN+`INTMEM_SIZE)));
+wire wb_tsel_iram = (~embed_mode && (m_wb_adr >= `NE_INTMEM_BEGIN) && (m_wb_adr < `NE_INTMEM_BEGIN+`INTMEM_SIZE))
+                    || (embed_mode && (((m_wb_adr >= `E_PROG_START) && (m_wb_adr < `E_PROG_START+`INTMEM_SIZE)) 
+                                    || (m_wb_adr >= `E_MEM_START) && (m_wb_adr < `E_MEM_START+`INTMEM_SIZE)));
+wire wb_tsel_clk = (m_wb_adr == `CLK_DIV_ADDR);
+
+always @(*) begin
+    if (wb_tsel_cw) begin
+        m_wb_ack = cw_out_wb_ack;
+        m_wb_err = cw_out_wb_err;
+        m_wb_i_dat = cw_out_wb_i_dat;
+    end else if (wb_tsel_iram) begin
+        m_wb_ack = iram_wb_ack;
+        m_wb_err = 1'b0;
+        m_wb_i_dat = iram_wb_i_dat;
+    end else if (wb_tsel_clk) begin
+        m_wb_ack = 1'b1;
+        m_wb_err = 1'b0;
+        m_wb_i_dat = `RW'b0;
+    end else begin
+        m_wb_ack = 1'b0;
+        m_wb_err = 1'b1;
+        m_wb_i_dat = `RW'b0;
+    end
+end
 
 // SYNCHRONIZERS
 
