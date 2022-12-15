@@ -33,6 +33,8 @@ module core #(parameter CORENO = 0, INT_VEC = 1) (
     input i_mem_exception,
     input i_mc_core_int,
     input [`RW-1:0] i_core_int_sreg,
+    output o_c_instr_long,
+    output [7:0] o_instr_long_addr,
 
     output [35:0] dbg_out,
     input [3:0] dbg_in
@@ -113,7 +115,7 @@ execute #(.CORENO(CORENO), .INT_VEC(INT_VEC)) execute(
     .c_sreg_store(dec_sreg_store), .c_sreg_jal_over(dec_sreg_jal_over), .i_irq(i_irq), .c_sreg_irt(dec_sreg_irt), .o_c_instr_page(o_c_instr_page),
     .sr_bus_addr(sr_bus_addr), .sr_bus_data_o(sr_bus_data_o), .sr_bus_we(sr_bus_we), .o_icache_flush(o_icache_flush), .c_sys(dec_sys), .c_mem_width(dec_mem_width),
     .o_mem_width(ew_mem_width), .o_c_data_page(o_c_data_page), .i_mem_exception(i_mem_exception), .dbg_out(dbg_out[32:0]), .dbg_reg_sel(dbg_in[2:0]), .dbg_hold(dbg_in[3]),
-    .i_core_int(i_mc_core_int), .i_core_int_sreg(i_core_int_sreg));
+    .i_core_int(i_mc_core_int), .i_core_int_sreg(i_core_int_sreg), .o_c_instr_long_mode(o_c_instr_long), .o_instr_addr_high(o_instr_long_addr));
 
 // Pipeline stage 3 - MEM&WB
 memwb memwb(

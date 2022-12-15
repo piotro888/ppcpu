@@ -56,6 +56,8 @@ module execute #(parameter CORENO = 0, INT_VEC = 1) (
     input i_mem_exception,
     input i_core_int,
     input [`RW-1:0] i_core_int_sreg,
+    output o_c_instr_long_mode,
+    output [7:0] o_instr_addr_high,
 
     output [32:0] dbg_out,
     input dbg_hold,
@@ -68,7 +70,7 @@ wire raw_hazard = ((c_used_operands[0] & o_reg_ie[c_l_reg_sel]) |
     (c_used_operands[1] & o_reg_ie[c_r_reg_sel])) & (o_submit | ~next_ready_delayed);
 // hazard happens also in the first cycle when next_ready becomes high, delayed signal is used 
 
-wire i_invalidate = i_flush | irq;
+wire i_invalidate = i_flush | irq | pc_high_updated;
 // hazard doesn't invalidate instructions, only holds it
 wire hold_req = raw_hazard | dbg_hold;
 
@@ -122,6 +124,7 @@ assign o_exec_pc = pc_val;
 wire [`RW-1:0] sreg_in = reg_r_con;
 reg [`RW-1:0] sreg_out;
 wire [`RW-1:0] dbg_reg_out;
+wire pc_overflow;
 
 // Submodules
 rf rf(
@@ -145,7 +148,7 @@ pc #(.INT_VEC(INT_VEC)) pc (
 `endif
     .i_clk(i_clk), .i_rst(i_rst), .i_bus(c_sreg_store | c_sreg_irt ? (c_sreg_irt ? sreg_out : sreg_in) : alu_bus),
     .i_c_pc_inc((c_pc_inc | (~jump_dec_en & jump_dec_valid)) & exec_submit), .i_c_pc_ie((c_pc_ie | (jump_dec_en & jump_dec_valid) | pc_write) & exec_submit),
-    .o_pc(pc_val), .i_c_pc_irq(irq));
+    .o_pc(pc_val), .i_c_pc_irq(irq), .o_pc_ovf(pc_overflow));
 
 // Cpu control registers
 register  #(.N(`ALU_FLAG_CNT)) alu_flag_reg (
@@ -163,7 +166,7 @@ wire jump_mispredict = jump_dec_valid & (jump_dec_en ^ i_jmp_predict);
 wire pc_write = (pc_sreg_ie & c_sreg_store) | c_sreg_irt;
 
 always @(posedge i_clk) begin
-    o_flush <= ((jump_mispredict | pc_write | flush_instr_mmu) & exec_submit) | irq; // invalidate itself and all previous stages at next cycle
+    o_flush <= ((jump_mispredict | pc_write | flush_instr_mmu) & exec_submit) | irq | pc_high_updated; // invalidate itself and all previous stages at next cycle
 end
 
 `define JUMP_CODE_UNCOND`JUMP_CODE_W'b10000
@@ -270,11 +273,13 @@ end
 `define SREG_CPUID `RW'b111
 `define SREG_COREID `RW'b1000
 `define SREG_MT_IRQ `RW'b1001 //,1010, 1011
+`define SREG_PC_HIGH `RW'b1100
+`define SREG_PC_HIGH_BUFF `RW'b1101
 
-reg pc_sreg_ie, sreg_priv_control_ie, sreg_irq_pc_ie, alu_flags_sreg_ie, sreg_jtr_ie, sreg_scratch_ie;
+reg pc_sreg_ie, sreg_priv_control_ie, sreg_irq_pc_ie, alu_flags_sreg_ie, sreg_jtr_ie, sreg_scratch_ie, sreg_pc_high_ie, sreg_pc_high_buff_ie;
 wire [`RW-1:0] sreg_priv_control_out, sreg_irq_pc_out, sreg_scratch_out;
 always @* begin
-    {pc_sreg_ie, sreg_irq_pc_ie, sreg_priv_control_ie, alu_flags_sreg_ie, sreg_jtr_ie, sreg_scratch_ie} = 6'b0;
+    {pc_sreg_ie, sreg_irq_pc_ie, sreg_priv_control_ie, alu_flags_sreg_ie, sreg_jtr_ie, sreg_scratch_ie, sreg_pc_high_ie, sreg_pc_high_buff_ie} = 8'b0;
     case (i_imm)
         `SREG_PC: begin
             sreg_out = pc_val;
@@ -289,7 +294,7 @@ always @* begin
             sreg_irq_pc_ie = c_sreg_store;
         end
         `SREG_JTR: begin
-            sreg_out = {14'b0, sreg_jtr_out};
+            sreg_out = {13'b0, sreg_jtr_out};
             sreg_jtr_ie = c_sreg_store & sreg_priv_mode;
         end
         `SREG_ALU_FLAGS: begin
@@ -312,6 +317,14 @@ always @* begin
         `SREG_MT_IRQ: begin // write is handled in upper_core
             sreg_out = i_core_int_sreg;
         end
+        `SREG_PC_HIGH: begin
+            sreg_pc_high_ie = c_sreg_store;
+            sreg_out = {8'b0, pc_high_out};
+        end
+        `SREG_PC_HIGH_BUFF: begin
+            sreg_pc_high_buff_ie = c_sreg_store;
+            sreg_out = {8'b0, pc_high_buff_out};
+        end 
         default:
             sreg_out = 16'b0;
     endcase
@@ -325,7 +338,7 @@ end
 // Special registers control
 
 
-wire [`RW-1:0] priv_in = (irq ? (sreg_priv_control_out & `RW'hfff9) : (c_sreg_irt ? (sreg_priv_control_out | `RW'h0004) : sreg_in)); // disable irq and paging flag on interrupt and re-enable on return
+wire [`RW-1:0] priv_in = (irq ? (`RW'b001) : (c_sreg_irt ? (sreg_priv_control_out | `RW'h0004) : sreg_in)); // disable irq and paging flag on interrupt and re-enable on return
 register #(.RESET_VAL(`RW'b001)) sreg_priv_control (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
@@ -333,8 +346,9 @@ register #(.RESET_VAL(`RW'b001)) sreg_priv_control (
     .i_clk(i_clk), .i_rst(i_rst), .i_d(priv_in), .o_d(sreg_priv_control_out),
     .i_ie((((sreg_priv_control_ie & sreg_priv_mode) | c_sreg_irt) & exec_submit) | irq));
 
-wire irq_en = sreg_priv_control_out[2], sreg_priv_mode = sreg_priv_control_out[0];
+wire sreg_priv_mode = sreg_priv_control_out[0];
 wire sreg_data_page = sreg_priv_control_out[1];
+wire irq_en = sreg_priv_control_out[2];
 
 register sreg_irq_pc (
 `ifdef USE_POWER_PINS
@@ -342,23 +356,24 @@ register sreg_irq_pc (
 `endif
     .i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_pc_ie ? sreg_in : (i_mem_exception ? mem_stage_pc : pc_val)), .o_d(sreg_irq_pc_out), .i_ie(irq | (sreg_irq_pc_ie & exec_submit)));
 
-wire [1:0] sreg_jtr_buff_o, sreg_jtr_out;
-wire jtr_jump_en = (sreg_irq_pc_ie | jump_dec_valid | c_sreg_irt) & exec_submit;
+wire [2:0] sreg_jtr_buff_o, sreg_jtr_out;
+wire jtr_jump_en = (pc_sreg_ie | jump_dec_valid | c_sreg_irt) & exec_submit;
 wire jtr_irqh_write = irq;
-wire [1:0] jtr_buff_in = (irq ? 2'b00 : sreg_in[1:0]);
-wire [1:0] jtr_in = (irq ? 2'b00 : sreg_jtr_buff_o);
-register  #(.RESET_VAL(2'b01), .N(2)) sreg_jtr_buff (
+wire [2:0] jtr_buff_in = (irq ? 3'b000 : sreg_in[2:0]);
+wire [2:0] jtr_in = (irq ? 3'b000 : sreg_jtr_buff_o);
+register  #(.RESET_VAL(3'b001), .N(3)) sreg_jtr_buff (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif
     .i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_buff_in), .o_d(sreg_jtr_buff_o), .i_ie(sreg_jtr_ie | jtr_irqh_write));
-register  #(.RESET_VAL(2'b01), .N(2)) sreg_jtr (
+register  #(.RESET_VAL(3'b001), .N(3)) sreg_jtr (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif
     .i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_in), .o_d(sreg_jtr_out), .i_ie(jtr_jump_en | jtr_irqh_write));
 assign o_c_instr_page = sreg_jtr_out[0];
 wire trap_flag = sreg_jtr_out[1];
+wire long_pc_mode = sreg_jtr_out[2];
 
 register sreg_scratch (
 `ifdef USE_POWER_PINS
@@ -375,7 +390,7 @@ register #(.N(5)) sreg_irq_flags (
     .i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_flags_in), .o_d(sreg_irq_flags_out), .i_ie(irq));
 
 wire immu_write = c_sreg_store & exec_submit & (sr_bus_addr >= `RW'h100 && sr_bus_addr < `RW'h100 + 16); // flush after write to mmu is executed
-wire flush_instr_mmu = (immu_write & o_c_instr_page) | ((jtr_in[0] ^ sreg_jtr_out[0]) & (jtr_jump_en | jtr_irqh_write));
+wire flush_instr_mmu = (immu_write & o_c_instr_page) | ((jtr_in[0] ^ sreg_jtr_out[0]) & (jtr_jump_en | jtr_irqh_write)) | pc_high_updated;
 always @(posedge i_clk)
     o_icache_flush <= flush_instr_mmu & ~i_rst;
 
@@ -388,6 +403,48 @@ always @(posedge i_clk) begin
     else if (i_next_ready)
         o_c_data_page <= sreg_data_page;
 end
+
+// Higher part of PC in long pointer mode
+// long pc mode is disabled on interrupt and reabled via jtr at irt, bot registers can be recovered
+wire [7:0] pc_high = (long_pc_mode ? pc_high_out : 'b0);
+
+wire pc_high_ovf = pc_overflow & long_pc_mode & exec_submit;
+wire pc_high_jtr = (pc_sreg_ie | jump_dec_valid | c_sreg_irt) & long_pc_mode & exec_submit;
+// Update from buffer at jump or at pc overflow
+wire [7:0] pc_high_in = (sreg_pc_high_ie ? sreg_in[7:0] : (pc_high_jtr ? pc_high_buff_out : pc_high_out+7'b1));
+wire [7:0] pc_high_out;
+register #(.N(8), .RESET_VAL(8'h80)) pc_high_reg (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst),
+    .i_d(pc_high_in),
+    .o_d(pc_high_out),
+    .i_ie((pc_high_ovf | pc_high_jtr | sreg_pc_high_ie) & exec_submit)
+);
+
+// Update buffer on function call (JAL) with current pointer
+wire [7:0] pc_high_buff_in = (sreg_pc_high_buff_ie ? sreg_in[7:0] : pc_high);
+wire [7:0] pc_high_buff_out;
+register #(.N(8), .RESET_VAL(8'h80)) pc_high_buff_reg (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk), .i_rst(i_rst),
+    .i_d(pc_high_buff_in),
+    .o_d(pc_high_buff_out),
+    .i_ie((sreg_pc_high_buff_ie | (c_sreg_jal_over & long_pc_mode)) & exec_submit)
+);
+
+wire pc_high_updated = |(prev_pc_high ^ pc_high); // flush pipeline and cache on update. current instuction is incorrect
+reg [7:0] prev_pc_high;
+always @(posedge i_clk) begin
+    if (i_rst) prev_pc_high <= 'b0;
+    else prev_pc_high <= pc_high;
+end
+
+assign o_c_instr_long_mode = long_pc_mode;
+assign o_instr_addr_high = pc_high;
 
 assign sr_bus_addr = i_imm;
 assign sr_bus_we = c_sreg_store & exec_submit;

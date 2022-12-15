@@ -141,6 +141,8 @@ interconnect_inner interconnect_inner (
     .c0_i_mem_exception(c0_i_mem_exception),
     .c0_i_mc_core_int(c0_i_mc_core_int),
     .c0_i_core_int_sreg(c0_i_core_int_sreg),
+    .c0_o_c_instr_long(c0_o_c_instr_long),
+    .c0_o_instr_long_addr(c0_o_instr_long_addr),
     .c0_dbg_out(c0_dbg_out),
     .c0_dbg_in(c0_dbg_in),
     .c1_clk(c1_clk),
@@ -170,6 +172,8 @@ interconnect_inner interconnect_inner (
     .c1_i_mem_exception(c1_i_mem_exception),
     .c1_i_mc_core_int(c1_i_mc_core_int),
     .c1_i_core_int_sreg(c1_i_core_int_sreg),
+    .c1_o_c_instr_long(c1_o_c_instr_long),
+    .c1_o_instr_long_addr(c1_o_instr_long_addr),
     .c1_dbg_out(c1_dbg_out),
     .c1_dbg_in(c1_dbg_in),
     .ic0_clk(ic0_clk),
@@ -246,6 +250,8 @@ wire [`RW-1:0] c0_dbg_r0, c0_dbg_pc;
 wire [35:0] c0_dbg_out;
 wire [3:0] c0_dbg_in;
 wire c0_i_mc_core_int, c0_disable, c0_i_irq;
+wire c0_o_c_instr_long;
+wire [7:0] c0_o_instr_long_addr;
 
 core #(.CORENO(0), .INT_VEC(1)) core_0 (
 `ifdef USE_POWER_PINS
@@ -255,7 +261,7 @@ core #(.CORENO(0), .INT_VEC(1)) core_0 (
     .o_mem_addr(c0_o_mem_addr), .o_mem_data(c0_o_mem_data), .i_mem_data(c0_i_mem_data), .o_mem_req(c0_o_mem_req), .o_mem_we(c0_o_mem_we), .i_mem_ack(c0_i_mem_ack),
     .dbg_r0(c0_dbg_r0), .dbg_pc(c0_dbg_pc), .i_irq(c0_i_irq), .o_c_instr_page(c0_o_c_instr_page), .sr_bus_addr(c0_sr_bus_addr),
     .sr_bus_data_o(c0_sr_bus_data_o), .sr_bus_we(c0_sr_bus_we), .o_icache_flush(c0_o_icache_flush), .o_mem_sel(c0_o_mem_sel), .o_c_data_page(c0_o_c_data_page),
-    .i_mem_exception(c0_i_mem_exception), .dbg_out(c0_dbg_out), .dbg_in(c0_dbg_in), .i_disable(c0_disable), .i_mc_core_int(c0_i_mc_core_int), .i_core_int_sreg(c0_i_core_int_sreg)
+    .i_mem_exception(c0_i_mem_exception), .dbg_out(c0_dbg_out), .dbg_in(c0_dbg_in), .i_disable(c0_disable), .i_mc_core_int(c0_i_mc_core_int), .i_core_int_sreg(c0_i_core_int_sreg), .o_c_instr_long(c0_o_c_instr_long), .o_instr_long_addr(c0_o_instr_long_addr)
 );
 
 wire c1_clk, c1_rst;
@@ -274,6 +280,8 @@ wire [`RW-1:0] c1_dbg_r0, c1_dbg_pc;
 wire [35:0] c1_dbg_out;
 wire [3:0] c1_dbg_in;
 wire c1_i_mc_core_int, c1_disable, c1_i_irq;
+wire c1_o_c_instr_long;
+wire [7:0] c1_o_instr_long_addr;
 
 core core_1 (
 `ifdef USE_POWER_PINS
@@ -283,7 +291,7 @@ core core_1 (
     .o_mem_addr(c1_o_mem_addr), .o_mem_data(c1_o_mem_data), .i_mem_data(c1_i_mem_data), .o_mem_req(c1_o_mem_req), .o_mem_we(c1_o_mem_we), .i_mem_ack(c1_i_mem_ack),
     .dbg_r0(c1_dbg_r0), .dbg_pc(c1_dbg_pc), .i_irq(c1_i_irq), .o_c_instr_page(c1_o_c_instr_page), .sr_bus_addr(c1_sr_bus_addr),
     .sr_bus_data_o(c1_sr_bus_data_o), .sr_bus_we(c1_sr_bus_we), .o_icache_flush(c1_o_icache_flush), .o_mem_sel(c1_o_mem_sel), .o_c_data_page(c1_o_c_data_page),
-    .i_mem_exception(c1_i_mem_exception), .dbg_out(c1_dbg_out), .dbg_in(c1_dbg_in), .i_disable(c1_disable), .i_mc_core_int(c1_i_mc_core_int), .i_core_int_sreg(c1_i_core_int_sreg)
+    .i_mem_exception(c1_i_mem_exception), .dbg_out(c1_dbg_out), .dbg_in(c1_dbg_in), .i_disable(c1_disable), .i_mc_core_int(c1_i_mc_core_int), .i_core_int_sreg(c1_i_core_int_sreg), .o_c_instr_long(c1_o_c_instr_long), .o_instr_long_addr(c1_o_instr_long_addr)
 );
 
 // DCACHE

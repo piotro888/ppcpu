@@ -49,6 +49,8 @@ module interconnect_inner (
     input c0_o_icache_flush,
     output c0_i_mem_exception,
     output c0_i_mc_core_int,
+    input c0_o_c_instr_long,
+    input [7:0] c0_o_instr_long_addr,
     output [`RW-1:0] c0_i_core_int_sreg,
     input [35:0] c0_dbg_out,
     output [3:0] c0_dbg_in,
@@ -74,6 +76,8 @@ module interconnect_inner (
     input c1_o_icache_flush,
     output c1_i_mem_exception,
     output c1_i_mc_core_int,
+    input c1_o_c_instr_long,
+    input [7:0] c1_o_instr_long_addr,
     output [`RW-1:0] c1_i_core_int_sreg,
     input [35:0] c1_dbg_out,
     output [3:0] c1_dbg_in,
@@ -164,7 +168,9 @@ immu immu_0 (
     .i_clk(core_clock), .i_rst(core_reset), 
     .i_addr(ic0_wb_adr), .o_addr(ic0_wb_adr_paged),
     .i_sr_addr(c0_sr_bus_addr), .i_sr_data(c0_sr_bus_data_o), .i_sr_we(c0_sr_bus_we),
-    .c_pag_en(c0_o_c_instr_page & ~inner_embed_mode)
+    .c_pag_en(c0_o_c_instr_page & ~inner_embed_mode),
+    .c_long_mode(c0_o_c_instr_long),
+    .i_long_high_addr(c0_o_instr_long_addr)
 );
 
 assign ic1_clk = core_clock;
@@ -184,7 +190,9 @@ immu immu_1 (
     .i_clk(core_clock), .i_rst(core_reset), 
     .i_addr(ic1_wb_adr), .o_addr(ic1_wb_adr_paged),
     .i_sr_addr(c1_sr_bus_addr), .i_sr_data(c1_sr_bus_data_o), .i_sr_we(c1_sr_bus_we),
-    .c_pag_en(c1_o_c_instr_page & ~inner_embed_mode)
+    .c_pag_en(c1_o_c_instr_page & ~inner_embed_mode),
+    .c_long_mode(c1_o_c_instr_long),
+    .i_long_high_addr(c1_o_instr_long_addr)
 );
 
 

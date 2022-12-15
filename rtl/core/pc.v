@@ -13,7 +13,9 @@ module pc #(parameter INT_VEC = `RW'b1) (
 
     input i_c_pc_inc,
     input i_c_pc_ie,
-    input i_c_pc_irq
+    input i_c_pc_irq,
+
+    output o_pc_ovf
 );
 
 always @(posedge i_clk) begin
@@ -27,5 +29,7 @@ always @(posedge i_clk) begin
         o_pc <= o_pc + `RW'b1;
     end
 end
+
+assign o_pc_ovf = o_pc[14] & i_c_pc_inc & ~i_c_pc_irq & ~i_c_pc_ie; // due to address shifiting, pc overflows at 14th bit 
 
 endmodule

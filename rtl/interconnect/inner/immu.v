@@ -19,6 +19,9 @@ module immu (
     input [`RW-1:0] i_sr_data,
     input i_sr_we,
 
+    input [`OUT_ADDR_W-`PC_ADDR_W-1:0] i_long_high_addr,
+    input c_long_mode,
+
     input c_pag_en
 );
 
@@ -63,7 +66,9 @@ end
 wire [`OUT_ADDR_W-1:0] page_disable_address = {`PAGE_DEFAULT_PREFIX, i_addr[`RW-1:0]};
 wire [`OUT_ADDR_W-1:0] page_enable_address = {page_res, page_off};
 
-assign o_addr = c_pag_en ? page_enable_address : page_disable_address;
+wire [`OUT_ADDR_W-1:0] long_mode_addr = {i_long_high_addr, i_addr};
+
+assign o_addr = c_long_mode ? long_mode_addr : (c_pag_en ? page_enable_address : page_disable_address);
 
 endmodule
 
