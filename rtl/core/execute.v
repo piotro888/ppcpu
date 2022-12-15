@@ -176,6 +176,9 @@ end
 `define JUMP_CODE_NE    `JUMP_CODE_W'b10111
 `define JUMP_CODE_OVF   `JUMP_CODE_W'b11000
 `define JUMP_CODE_PAR   `JUMP_CODE_W'b11001
+`define JUMP_CODE_GTU   `JUMP_CODE_W'b11010
+`define JUMP_CODE_GEU   `JUMP_CODE_W'b11011
+`define JUMP_CODE_LEU   `JUMP_CODE_W'b11100
 always @(*) begin
     case (c_jump_cond_code[`JUMP_CODE_W-1:0])
         `JUMP_CODE_UNCOND:
@@ -198,6 +201,12 @@ always @(*) begin
             jump_dec_en = alu_flags_q[`ALU_FLAG_O];
         `JUMP_CODE_PAR:
             jump_dec_en = alu_flags_q[`ALU_FLAG_P];
+        `JUMP_CODE_GTU:
+            jump_dec_en = ~(alu_flags_q[`ALU_FLAG_C] | alu_flags_q[`ALU_FLAG_Z]);
+        `JUMP_CODE_GEU:
+            jump_dec_en = ~alu_flags_q[`ALU_FLAG_C];
+        `JUMP_CODE_LEU:
+            jump_dec_en = alu_flags_q[`ALU_FLAG_C] | alu_flags_q[`ALU_FLAG_Z];
         default:
             jump_dec_en = 1'b0;
     endcase
