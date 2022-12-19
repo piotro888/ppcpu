@@ -51,6 +51,8 @@ module interconnect_inner (
     output c0_i_mc_core_int,
     input c0_o_c_instr_long,
     input [7:0] c0_o_instr_long_addr,
+    input c0_o_mem_long_mode,
+    input [7:0] c0_o_mem_high_addr,
     output [`RW-1:0] c0_i_core_int_sreg,
     input [35:0] c0_dbg_out,
     output [3:0] c0_dbg_in,
@@ -78,6 +80,8 @@ module interconnect_inner (
     output c1_i_mc_core_int,
     input c1_o_c_instr_long,
     input [7:0] c1_o_instr_long_addr,
+    input c1_o_mem_long_mode,
+    input [7:0] c1_o_mem_high_addr,
     output [`RW-1:0] c1_i_core_int_sreg,
     input [35:0] c1_dbg_out,
     output [3:0] c1_dbg_in,
@@ -260,7 +264,7 @@ dmmu dmmu0 (
     .i_clk(core_clock), .i_rst(core_reset),
     .i_addr(c0_o_mem_addr), .o_addr(c0_mem_addr_paged),
     .i_sr_addr(c0_sr_bus_addr), .i_sr_data(c0_sr_bus_data_o), .i_sr_we(c0_sr_bus_we),
-    .c_pag_en(c0_o_c_data_page), .o_cacheable(c0_mmu_data_cacheable)
+    .c_pag_en(c0_o_c_data_page), .o_cacheable(c0_mmu_data_cacheable), .c_long(c0_o_mem_long_mode), .i_high_addr(c0_o_mem_high_addr)
 );
 
 wire [`WB_ADDR_W-1:0] c1_mem_addr_paged;
@@ -272,7 +276,7 @@ dmmu dmmu1 (
     .i_clk(core_clock), .i_rst(core_reset),
     .i_addr(c1_o_mem_addr), .o_addr(c1_mem_addr_paged),
     .i_sr_addr(c1_sr_bus_addr), .i_sr_data(c1_sr_bus_data_o), .i_sr_we(c1_sr_bus_we),
-    .c_pag_en(c1_o_c_data_page), .o_cacheable(c1_mmu_data_cacheable)
+    .c_pag_en(c1_o_c_data_page), .o_cacheable(c1_mmu_data_cacheable), .c_long(c1_o_mem_long_mode), .i_high_addr(c1_o_mem_high_addr)
 );
 
 mem_dcache_arb mem_dcache_arb (

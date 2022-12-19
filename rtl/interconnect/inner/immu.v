@@ -40,6 +40,7 @@ wire [`PAGE_RES_SIZE-1:0] page_res = {1'b1, page_table[page_idx][`PAGE_RES_SIZE-
 
 wire [`RW-1:0] sr_addr_idx = i_sr_addr-`SR_ADDR_OFF;
 wire addr_in_range = (i_sr_addr >= `SR_ADDR_OFF) && (i_sr_addr < `SR_ADDR_OFF+16);
+reg [7:0] high_addr_off;
 always @(posedge i_clk) begin
     if (i_rst) begin
         page_table[0] <= `PAGE_RES_SIZE'h7fe;
@@ -60,13 +61,15 @@ always @(posedge i_clk) begin
         page_table[15] <= `PAGE_RES_SIZE'b0;
     end else if (i_sr_we & addr_in_range)
         page_table[sr_addr_idx[`PAGE_IDX_W-1:0]] <= i_sr_data[`PAGE_RES_SIZE-1:0];
+    else if (i_sr_we & i_sr_addr == `SR_ADDR_OFF+16)
+        high_addr_off <= i_sr_data[7:0];
 end
 
 `define PAGE_DEFAULT_PREFIX 8'h80
 wire [`OUT_ADDR_W-1:0] page_disable_address = {`PAGE_DEFAULT_PREFIX, i_addr[`RW-1:0]};
 wire [`OUT_ADDR_W-1:0] page_enable_address = {page_res, page_off};
 
-wire [`OUT_ADDR_W-1:0] long_mode_addr = {i_long_high_addr, i_addr};
+wire [`OUT_ADDR_W-1:0] long_mode_addr = {i_long_high_addr+high_addr_off, i_addr};
 
 assign o_addr = c_long_mode ? long_mode_addr : (c_pag_en ? page_enable_address : page_disable_address);
 

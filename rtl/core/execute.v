@@ -28,7 +28,7 @@ module execute #(parameter CORENO = 0, INT_VEC = 1) (
     input [`JUMP_CODE_W-1:0] c_jump_cond_code,
     input c_mem_access, c_mem_we, c_mem_width,
     input [1:0] c_used_operands,
-    input c_sreg_load, c_sreg_store, c_sreg_jal_over, c_sreg_irt, c_sys,
+    input c_sreg_load, c_sreg_store, c_sreg_jal_over, c_sreg_irt, c_sys, c_mem_long,
 
     // Signals to fetch stage to handle mispredictions
     output o_pc_update,
@@ -57,7 +57,9 @@ module execute #(parameter CORENO = 0, INT_VEC = 1) (
     input i_core_int,
     input [`RW-1:0] i_core_int_sreg,
     output o_c_instr_long_mode,
+    output reg o_mem_long_mode,
     output [7:0] o_instr_addr_high,
+    output reg [7:0] o_mem_addr_high,
 
     output [32:0] dbg_out,
     input dbg_hold,
@@ -66,8 +68,11 @@ module execute #(parameter CORENO = 0, INT_VEC = 1) (
 
 reg next_ready_delayed;
 // detect RAW pipeline hazard
-wire raw_hazard = ((c_used_operands[0] & o_reg_ie[c_l_reg_sel]) |
-    (c_used_operands[1] & o_reg_ie[c_r_reg_sel])) & (o_submit | ~next_ready_delayed);
+wire raw_hazard = (
+        (c_used_operands[0] & o_reg_ie[c_l_reg_sel]) |
+        (c_used_operands[1] & o_reg_ie[c_r_reg_sel]) |
+        (c_mem_long & sreg_long_ptr_en & c_used_operands[0] & o_reg_ie[c_l_reg_sel+1])
+    ) & (o_submit | ~next_ready_delayed);
 // hazard happens also in the first cycle when next_ready becomes high, delayed signal is used 
 
 wire i_invalidate = i_flush | irq | pc_high_updated;
@@ -125,6 +130,7 @@ wire [`RW-1:0] sreg_in = reg_r_con;
 reg [`RW-1:0] sreg_out;
 wire [`RW-1:0] dbg_reg_out;
 wire pc_overflow;
+wire [`RW-1:0] reg_l_high_con;
 
 // Submodules
 rf rf(
@@ -133,7 +139,8 @@ rf rf(
 `endif
     .i_clk(i_clk), .i_rst(i_rst), .i_d(i_reg_data), .o_lout(reg_l_con),
     .o_rout(reg_r_con), .i_lout_sel(c_l_reg_sel), .i_rout_sel(c_r_reg_sel),
-    .i_ie(i_reg_ie), .i_gie(1'b1), .dbg_r0(dbg_r0), .dbg_sel(dbg_reg_sel), .dbg_reg(dbg_reg_out));
+    .i_ie(i_reg_ie), .i_gie(1'b1), .o_l_high_out(reg_l_high_con),
+    .dbg_r0(dbg_r0), .dbg_sel(dbg_reg_sel), .dbg_reg(dbg_reg_out));
 
 alu alu(
 `ifdef USE_POWER_PINS
@@ -228,6 +235,8 @@ always @(posedge i_clk) begin
         o_mem_access <= c_mem_access;
         o_mem_we <= c_mem_we;
         o_mem_width <= c_mem_width;
+        o_mem_long_mode <= c_mem_long & sreg_long_ptr_en;
+        o_mem_addr_high <= computed_mem_addr_high;
         o_submit <= 1'b1;
     end else begin
         o_submit <= 1'b0;
@@ -338,8 +347,8 @@ end
 // Special registers control
 
 
-wire [`RW-1:0] priv_in = (irq ? (`RW'b001) : (c_sreg_irt ? (sreg_priv_control_out | `RW'h0004) : sreg_in)); // disable irq and paging flag on interrupt and re-enable on return
-register #(.RESET_VAL(`RW'b001)) sreg_priv_control (
+wire [`RW-1:0] priv_in = (irq ? (`RW'b0001) : (c_sreg_irt ? (sreg_priv_control_out | `RW'h0004) : sreg_in)); // disable irq and paging flag on interrupt and re-enable on return
+register #(.RESET_VAL(`RW'b0001)) sreg_priv_control (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif
@@ -349,6 +358,7 @@ register #(.RESET_VAL(`RW'b001)) sreg_priv_control (
 wire sreg_priv_mode = sreg_priv_control_out[0];
 wire sreg_data_page = sreg_priv_control_out[1];
 wire irq_en = sreg_priv_control_out[2];
+wire sreg_long_ptr_en = sreg_priv_control_out[3];
 
 register sreg_irq_pc (
 `ifdef USE_POWER_PINS
@@ -445,6 +455,9 @@ end
 
 assign o_c_instr_long_mode = long_pc_mode;
 assign o_instr_addr_high = pc_high;
+
+wire [7:0] computed_mem_addr_high = (~alu_flags_d[`ALU_FLAG_C] & alu_r_bus[`RW-1] ? reg_l_high_con[7:0]-8'b1 : 
+    (alu_flags_d[`ALU_FLAG_C] ? reg_l_high_con[7:0]+8'b1 : reg_l_high_con[7:0]));
 
 assign sr_bus_addr = i_imm;
 assign sr_bus_we = c_sreg_store & exec_submit;

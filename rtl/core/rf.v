@@ -17,6 +17,7 @@ module rf (
     input [`RW-1:0] i_d,
     output [`RW-1:0] o_lout,
     output [`RW-1:0] o_rout,
+    output [`RW-1:0] o_l_high_out,
 
     output [`RW-1:0] dbg_r0,
     input [`REGNO_LOG-1:0] dbg_sel,
@@ -27,6 +28,7 @@ wire [`RW-1:0] reg_outputs [`REGNO-1:0];
 
 assign o_lout = reg_outputs[i_lout_sel];
 assign o_rout = reg_outputs[i_rout_sel];
+assign o_l_high_out = reg_outputs[(i_lout_sel&3'b110) | 3'b1];
 
 assign dbg_r0 = reg_outputs[0];
 assign dbg_reg = reg_outputs[dbg_sel];
