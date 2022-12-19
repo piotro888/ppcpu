@@ -460,7 +460,7 @@ wire [7:0] computed_mem_addr_high = (~alu_flags_d[`ALU_FLAG_C] & alu_r_bus[`RW-1
     (alu_flags_d[`ALU_FLAG_C] ? reg_l_high_con[7:0]+8'b1 : reg_l_high_con[7:0]));
 
 assign sr_bus_addr = i_imm;
-assign sr_bus_we = c_sreg_store & exec_submit;
+assign sr_bus_we = c_sreg_store & sreg_priv_mode & exec_submit;
 assign sr_bus_data_o = sreg_in;
 
 assign dbg_out = {o_ready, pc_val, dbg_reg_out};
