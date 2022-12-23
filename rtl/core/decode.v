@@ -83,6 +83,7 @@ module decode (
 `define OPC_SLO 7'h29
 `define OPC_LL8 7'h2a
 `define OPC_SL8 7'h2b
+`define OPC_MOD 7'h2c
 // sreg imm??
 
 wire [6:0] opcode = i_instr_l[6:0];
@@ -320,7 +321,6 @@ always @(*) begin
             c_l_reg_sel = reg_st;
             c_r_reg_sel = reg_nd;
             c_rf_ie[reg_dst] = 1'b1;
-            c_alu_flags_ie = 1'b1;
             c_used_operands = 2'b11;
         end
         `OPC_DIV: begin
@@ -328,7 +328,6 @@ always @(*) begin
             c_l_reg_sel = reg_st;
             c_r_reg_sel = reg_nd;
             c_rf_ie[reg_dst] = 1'b1;
-            c_alu_flags_ie = 1'b1;
             c_used_operands = 2'b11;
         end
         `OPC_SYS: begin
@@ -452,6 +451,13 @@ always @(*) begin
             c_used_operands = 2'b11;
             c_mem_long = 1'b1;
             c_mem_width = 1'b1;
+        end
+        `OPC_MOD: begin
+            c_alu_mode = `ALU_MODE_MOD;
+            c_l_reg_sel = reg_st;
+            c_r_reg_sel = reg_nd;
+            c_rf_ie[reg_dst] = 1'b1;
+            c_used_operands = 2'b11;
         end
         default: begin
         end

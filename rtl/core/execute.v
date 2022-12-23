@@ -77,7 +77,7 @@ wire raw_hazard = (
 
 wire i_invalidate = i_flush | irq | pc_high_updated;
 // hazard doesn't invalidate instructions, only holds it
-wire hold_req = raw_hazard | dbg_hold;
+wire hold_req = raw_hazard | dbg_hold | alu_mul_busy;
 
 wire i_valid = i_submit & ~i_invalidate;
 reg hold_valid;
@@ -119,6 +119,7 @@ wire [`RW-1:0] alu_bus;
 // Muxes definitions
 assign alu_l_bus = reg_l_con;
 assign alu_r_bus = (c_r_bus_imm ? i_imm : reg_r_con);
+assign alu_bus = (mul_div_op ? alu_mul_res : alu_res);
 
 // Component connects
 wire [`RW-1:0] pc_val;
@@ -131,6 +132,9 @@ reg [`RW-1:0] sreg_out;
 wire [`RW-1:0] dbg_reg_out;
 wire pc_overflow;
 wire [`RW-1:0] reg_l_high_con;
+wire [`RW-1:0] alu_mul_res, alu_res;
+wire alu_mul_busy;
+wire mul_div_op = (c_alu_mode == `ALU_MODE_MUL) || (c_alu_mode == `ALU_MODE_DIV) || (c_alu_mode == `ALU_MODE_MOD);
 
 // Submodules
 rf rf(
@@ -146,8 +150,23 @@ alu alu(
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif
-    .i_l(alu_l_bus), .i_r(alu_r_bus), .o_out(alu_bus), .i_mode(c_alu_mode), 
+    .i_l(alu_l_bus), .i_r(alu_r_bus), .o_out(alu_res), .i_mode(c_alu_mode), 
     .o_flags(alu_flags_d), .i_carry(alu_flags_q[`ALU_FLAG_C] & c_alu_carry_en));
+
+alu_mul_div alu_mul_div (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(i_clk),
+    .i_rst(i_rst),
+
+    .i_a(alu_l_bus), .i_b(alu_r_bus), .o_d(alu_mul_res),
+    .i_submit(mul_div_op & i_submit), .i_flush(i_invalidate),
+    .o_busy(alu_mul_busy),
+    .i_mul(c_alu_mode == `ALU_MODE_MUL),
+    .i_div(c_alu_mode == `ALU_MODE_DIV),
+    .i_mod(c_alu_mode == `ALU_MODE_MOD)
+);
 
 pc #(.INT_VEC(INT_VEC)) pc (
 `ifdef USE_POWER_PINS
