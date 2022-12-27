@@ -390,12 +390,12 @@ wire jtr_jump_en = (pc_sreg_ie | jump_dec_valid | c_sreg_irt) & exec_submit;
 wire jtr_irqh_write = irq;
 wire [2:0] jtr_buff_in = (irq ? 3'b000 : sreg_in[2:0]);
 wire [2:0] jtr_in = (irq ? 3'b000 : sreg_jtr_buff_o);
-register  #(.RESET_VAL(3'b001), .N(3)) sreg_jtr_buff (
+register  #(.RESET_VAL((CORENO == 0 ? 3'b001 : 3'b000)), .N(3)) sreg_jtr_buff (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif
     .i_clk(i_clk), .i_rst(i_rst), .i_d(jtr_buff_in), .o_d(sreg_jtr_buff_o), .i_ie(sreg_jtr_ie | jtr_irqh_write));
-register  #(.RESET_VAL(3'b001), .N(3)) sreg_jtr (
+register  #(.RESET_VAL((CORENO == 0 ? 3'b001 : 3'b000)), .N(3)) sreg_jtr (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif
