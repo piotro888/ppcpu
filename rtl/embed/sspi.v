@@ -13,7 +13,7 @@ module sspi (
 
     output reg wb_cyc,
     output reg wb_stb,
-    output [23:0]  wb_adr,
+    output reg [23:0] wb_adr,
     input [15:0] wb_i_dat,
     output reg [15:0] wb_o_dat,
     output reg wb_we,

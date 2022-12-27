@@ -32,10 +32,6 @@ always @(posedge i_clk) begin
     end else if (i_submit) begin
         cbit <= (i_mul ? `RWLOG'b1 : `RWLOG'b0);
         comp <= 1'b1;
-
-        mul_res <= (i_b[0] ? i_a : `RW'b0);
-        div_res <= `RW'b0;
-        div_cur <= {{`RW-1{1'b0}}, i_a[`RW-1]};
     end else if (comp) begin
         cbit <= cbit+1'b1;
         if (cbit == `RWLOG'd15) begin
@@ -47,7 +43,9 @@ end
 reg [`RW-1:0] mul_res;
 
 always @(posedge i_clk) begin
-    if (comp & i_b[cbit] & i_mul) begin
+    if (i_submit & i_mul) begin
+        mul_res <= (i_b[0] ? i_a : `RW'b0);
+    end else if (comp & i_b[cbit] & i_mul) begin
         mul_res <= mul_res + (i_a<<cbit);
     end
 end
@@ -56,7 +54,10 @@ reg [`RW-1:0] div_res, div_cur;
 wire [`RW-1:0] div_diff = div_cur-i_b;
 
 always @(posedge i_clk) begin
-    if (comp & (i_div | i_mod)) begin
+    if (i_submit & (i_div | i_mod)) begin
+        div_res <= `RW'b0;
+        div_cur <= {{`RW-1{1'b0}}, i_a[`RW-1]};
+    end else if (comp & (i_div | i_mod)) begin
         if (div_cur >= i_b) begin
             div_res[`RW-cbit-1] <= 1'b1;
             if (cbit != `RWLOG'd15)

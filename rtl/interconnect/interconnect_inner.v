@@ -153,6 +153,8 @@ module interconnect_inner (
 
 assign c0_clk = core_clock;
 assign c0_rst = core_reset;
+assign c1_clk = core_clock;
+assign c1_rst = core_reset;
 
 // CORE <-> ICACHE <-> IMMU
 assign ic0_clk = core_clock;

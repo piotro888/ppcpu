@@ -156,7 +156,7 @@ interconnect_inner interconnect_inner (
     .c1_i_req_data(c1_i_req_data),
     .c1_i_req_data_valid(c1_i_req_data_valid),
     .c1_dbg_r0(c1_dbg_r0),
-	.c1_dbg_pc(c1_dbg_pc),
+    .c1_dbg_pc(c1_dbg_pc),
     .c1_o_mem_addr(c1_o_mem_addr),
     .c1_o_mem_data(c1_o_mem_data),
     .c1_i_mem_data(c1_i_mem_data),
@@ -292,7 +292,7 @@ wire [7:0] c1_o_instr_long_addr;
 wire c1_o_mem_long;
 wire [7:0] c1_o_mem_addr_high;
 
-core core_1 (
+core #(.CORENO(1), .INT_VEC(2)) core_1 (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif

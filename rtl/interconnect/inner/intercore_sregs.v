@@ -40,7 +40,7 @@ assign sr_bus_dat[0] = c0_sr_bus_data_o;
 assign sr_bus_dat[1] = c1_sr_bus_data_o;
 
 assign c0_sr_bus_data_i = {14'b0, ic_irq_state};
-assign c0_sr_bus_data_i = {14'b0, ic_irq_state};
+assign c1_sr_bus_data_i = {14'b0, ic_irq_state};
 
 reg [`CORES-1:0] ic_irq_state;
 
