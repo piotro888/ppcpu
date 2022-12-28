@@ -24,7 +24,7 @@ module dcache (
     output reg wb_stb,
     input [`RW-1:0] wb_i_dat,
     output reg [`RW-1:0] wb_o_dat,
-    output [`WB_ADDR_W-1:0]  wb_adr,
+    output reg [`WB_ADDR_W-1:0] wb_adr,
     output reg wb_we,
     output [1:0] wb_sel,
     output wb_4_burst,
@@ -146,7 +146,7 @@ assign mem_exception = (state == `S_IDLE && mem_req && illegal_address) | (state
 
 wire wb_sel_adr_source = (state == `S_MISS_WR) | (state == `S_CREAD && cache_gmiss && all_entries_dirty);
 
-assign wb_adr = (wb_sel_adr_source ? {old_entry_addr[`WB_ADDR_W-1:2], line_burst_cnt} : {mem_addr[`WB_ADDR_W-1:2], line_burst_cnt});
+wire [23:0] wb_adr_w = (wb_sel_adr_source ? {old_entry_addr[`WB_ADDR_W-1:2], line_burst_cnt} : {mem_addr[`WB_ADDR_W-1:2], line_burst_cnt});
 assign wb_sel = (mem_cache_enable ? 2'b11 : mem_sel);
 assign wb_4_burst = mem_cache_enable;
 
@@ -162,31 +162,41 @@ wire [`LINE_SIZE-1:0] pre_assembled_line = {wb_i_dat, line_collect[47:0]};
 reg transfer_bus_err;
 wire transfer_bus_err_w = transfer_bus_err | (wb_cyc & wb_stb & wb_err);
 
+reg int_wb_cyc;
+
 reg [`CACHE_OFF_W-1:0] line_burst_cnt;
 always @(posedge i_clk) begin
     if (i_rst) begin
-        wb_cyc <= 1'b0;
-        wb_stb <= 1'b0;
+        int_wb_cyc <= 1'b0;
         transfer_bus_err <= 1'b0;
     end else if (state == `S_IDLE && mem_req && ~mem_cache_enable && ~illegal_address) begin
-        wb_cyc <= 1'b1;
-        wb_stb <= 1'b1;
+        int_wb_cyc <= 1'b1;
         wb_we <= mem_we;
         line_burst_cnt <= mem_addr[1:0];
         transfer_bus_err <= 1'b0;
     end else if (cache_gmiss || (state == `S_MISS_WR && mem_op_end)) begin
         line_burst_cnt <= 2'b0;
-        wb_cyc <= 1'b1;
-        wb_stb <= 1'b1;
+        int_wb_cyc <= 1'b1;
         wb_we <= all_entries_dirty & ~mem_op_end;
         transfer_bus_err <= transfer_bus_err & ~cache_gmiss; // clear error only on new request. Don't update cache if first write failed
     end else if (mem_op_end || (state == `S_NOCACHE && wb_cyc & wb_stb & (wb_ack | wb_err))) begin
         line_burst_cnt <= 2'b0;
-        wb_cyc <= 1'b0;
-        wb_stb <= 1'b0;
-    end else if (wb_cyc & wb_stb & (wb_ack | wb_err)) begin
+        int_wb_cyc <= 1'b0;
+    end else if (int_wb_cyc & wb_stb & (wb_ack | wb_err)) begin
         line_burst_cnt <= line_burst_cnt + 1'b1;
         transfer_bus_err <= transfer_bus_err | wb_err;
+    end
+end
+
+// dealy wishbone start to cut combinational paths on addr
+always @(posedge i_clk) begin
+    wb_adr <= wb_adr_w;
+    if (mem_op_end || (state == `S_NOCACHE && wb_cyc & wb_stb & (wb_ack | wb_err))) begin
+        wb_cyc <= 1'b0;
+        wb_stb <= 1'b0;
+    end else begin
+        wb_cyc <= int_wb_cyc;
+        wb_stb <= int_wb_cyc;
     end
 end
 
