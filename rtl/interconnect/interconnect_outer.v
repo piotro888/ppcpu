@@ -94,7 +94,10 @@ wire embed_mode = m_io_in[25];
 
 assign spi_clk = m_io_in[26];
 assign spi_mosi = m_io_in[27];
-assign m_io_out[28] = spi_miso; 
+assign m_io_out[28] = spi_miso;
+
+assign gpio_in = m_io_in[36:29];
+assign m_io_out[36:29] = gpio_out;
 
 assign m_io_oeb[1:0] = 2'b0;
 assign m_io_oeb[17:2] = {16{cw_dir}}; // try to invert
@@ -103,7 +106,8 @@ assign m_io_oeb[21:20] = 2'b00;
 assign m_io_oeb[25:22] = 4'b1111;
 assign m_io_oeb[27:26] = 2'b11;
 assign m_io_oeb[28] = 1'b0;
-assign m_io_oeb[`MPRJ_IO_PADS-1:29] = {`MPRJ_IO_PADS-29{1'b1}}; 
+assign m_io_oeb[36:29] = gpio_dir;
+assign m_io_oeb[`MPRJ_IO_PADS-1:37] = {`MPRJ_IO_PADS-37{1'b1}};
 
 assign inner_embed_mode = embed_mode;
 assign inner_disable = core_disable;
@@ -270,6 +274,31 @@ sspi sspi (
     .wb_sel(spi_wb_sel)
 );
 
+wire gpio_wb_stb;
+wire [`RW-1:0] gpio_wb_o_dat;
+wire gpio_wb_ack;
+wire [7:0] gpio_in, gpio_out, gpio_dir;
+
+gpio #(.N(8)) gpio (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(core_clock),
+    .i_rst(core_reset),
+
+    .gpio_in(gpio_in),
+    .gpio_out(gpio_out),
+    .gpio_dir(gpio_dir),
+
+    .wb_cyc(m_wb_cyc),
+    .wb_stb(m_wb_stb),
+    .wb_i_dat(m_wb_o_dat),
+    .wb_o_dat(gpio_wb_o_dat),
+    .wb_adr(m_wb_adr),
+    .wb_we(m_wb_we),
+    .wb_ack(gpio_wb_ack)
+);
+
 // WISHBONE ARBITTER INNER BUS, EXT SPI BUS
 wire m_wb_cyc, m_wb_stb;
 wire m_wb_we;
@@ -343,11 +372,15 @@ end
 `define E_PROG_START    24'h800000
 `define E_MEM_START     24'h100000
 `define INTMEM_SIZE     24'h200
-wire wb_tsel_cw = (~embed_mode && (m_wb_adr != `CLK_DIV_ADDR) && ((m_wb_adr < `NE_INTMEM_BEGIN) || (m_wb_adr >= `NE_INTMEM_BEGIN+`INTMEM_SIZE)));
+`define GPIO_START      24'h001010
+`define GPIO_END        24'h001012
+
+wire wb_tsel_cw = (~embed_mode && (m_wb_adr != `CLK_DIV_ADDR) && (~((m_wb_adr >= `GPIO_START) && (m_wb_adr <= `GPIO_END))) && ((m_wb_adr < `NE_INTMEM_BEGIN) || (m_wb_adr >= `NE_INTMEM_BEGIN+`INTMEM_SIZE)));
 wire wb_tsel_iram = (~embed_mode && (m_wb_adr >= `NE_INTMEM_BEGIN) && (m_wb_adr < `NE_INTMEM_BEGIN+`INTMEM_SIZE))
                     || (embed_mode && (((m_wb_adr >= `E_PROG_START) && (m_wb_adr < `E_PROG_START+`INTMEM_SIZE)) 
                                     || (m_wb_adr >= `E_MEM_START) && (m_wb_adr < `E_MEM_START+`INTMEM_SIZE)));
 wire wb_tsel_clk = (m_wb_adr == `CLK_DIV_ADDR);
+wire wb_tsel_gpio = (m_wb_adr >= `GPIO_START) && (m_wb_adr <= `GPIO_END);
 
 always @(*) begin
     if (wb_tsel_cw) begin
@@ -362,6 +395,10 @@ always @(*) begin
         m_wb_ack = 1'b1;
         m_wb_err = 1'b0;
         m_wb_i_dat = `RW'b0;
+    end else if (wb_tsel_gpio) begin
+        m_wb_ack = gpio_wb_ack;
+        m_wb_err = 1'b0;
+        m_wb_i_dat = gpio_wb_o_dat;
     end else begin
         m_wb_ack = 1'b0;
         m_wb_err = 1'b1;
