@@ -118,7 +118,7 @@ reg [`WB_DATA_W-1:0] wb_i_dat;
 wire [`WB_ADDR_W-1:0]  wb_adr;
 wire wb_we;
 reg wb_ack;
-wire wb_err;
+reg wb_err;
 wire [`WB_SEL_BITS-1:0] wb_sel;
 
 wb_decomp wb_decomp (
@@ -309,24 +309,31 @@ always @(*) begin
     if ((wb_adr >= UART_BASE) && (wb_adr <= UART_END)) begin
         wb_i_dat = uart_wb_i_dat;
         wb_ack = wb_cyc & wb_stb;
+        wb_err = 1'b0;
     end else if ((wb_adr >= TIMER_BASE) && (wb_adr <= TIMER_END)) begin
         wb_i_dat = timer_wb_i_dat;
         wb_ack = timer_wb_ack;
+        wb_err = 1'b0;
     end else if ((wb_adr >= IRQC_BASE) && (wb_adr <= IRQC_END)) begin
         wb_i_dat = irqc_wb_i_dat;
         wb_ack = irqc_wb_ack;
+        wb_err = 1'b0;
     end else if ((wb_adr >= SPI_BASE) && (wb_adr <= SPI_END)) begin
         wb_i_dat = spi_wb_i_dat;
         wb_ack = spi_wb_ack;
+        wb_err = 1'b0;
     end else if ((wb_adr >= SDRAM_BASE) && (wb_adr <= SDRAM_END)) begin
         wb_i_dat = sdram_data_out;
         wb_ack = sdram_ack;
+        wb_err = 1'b0;
     end else if ((wb_adr >= ROM_BASE) && (wb_adr <= ROM_END)) begin
         wb_i_dat = rom_data;
         wb_ack = wb_cyc & wb_stb;
+        wb_err = 1'b0;
     end else begin
         wb_i_dat = 16'b0;
         wb_ack = 1'b0;
+        wb_err = 1'b1;
     end
 end
 

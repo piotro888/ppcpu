@@ -142,7 +142,7 @@ end
 `define FIRST_PAGE `WB_ADDR_W'h000800
 wire illegal_address = mem_addr < `FIRST_PAGE;
 
-assign mem_exception = (state == `S_IDLE && mem_req && illegal_address);
+assign mem_exception = (state == `S_IDLE && mem_req && illegal_address) | (state == `S_NOCACHE && wb_cyc && wb_stb && wb_err);
 
 wire wb_sel_adr_source = (state == `S_MISS_WR) | (state == `S_CREAD && cache_gmiss && all_entries_dirty);
 
