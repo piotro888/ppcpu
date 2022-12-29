@@ -76,38 +76,40 @@ wire cw_clk; // ouputs for bridge
 wire cw_rst;
 
 // PIN ASSIGNMENTS
+// pins [4:0] are reserved to mgmt during boot
 
-assign m_io_out[0] = cw_req;
-assign m_io_out[1] = cw_dir;
-assign m_io_out[17:2] = cw_io_o;
-assign cw_io_i = m_io_in[17:2];
-assign cw_ack = m_io_in[18];
-assign cw_err = m_io_in[19];
-assign m_io_out[20] = cw_clk;
-assign m_io_out[21] = cw_rst; // reset out
+assign m_io_out[8] = cw_req;
+assign m_io_out[9] = cw_dir;
+assign m_io_out[25:10] = cw_io_o;
+assign cw_io_i = m_io_in[25:10];
+assign cw_ack = m_io_in[26];
+assign cw_err = m_io_in[27];
+assign m_io_out[28] = cw_clk;
+assign m_io_out[29] = cw_rst; // reset out
 
-wire ext_irq = m_io_in[22];
+wire ext_irq = m_io_in[30];
 
-wire cs_split_clock = m_io_in[23];
-wire core_disable = m_io_in[24];
-wire embed_mode = m_io_in[25];
+wire cs_split_clock = m_io_in[31];
+wire core_disable = m_io_in[32];
+wire embed_mode = m_io_in[33];
 
-assign spi_clk = m_io_in[26];
-assign spi_mosi = m_io_in[27];
-assign m_io_out[28] = spi_miso;
+assign spi_clk = m_io_in[34];
+assign spi_mosi = m_io_in[35];
+assign m_io_out[36] = spi_miso;
 
-assign gpio_in = m_io_in[36:29];
-assign m_io_out[36:29] = gpio_out;
+assign gpio_in = m_io_in[7:0];
+assign m_io_out[7:0] = gpio_out;
+assign m_io_out[37] = 1'b1;
 
-assign m_io_oeb[1:0] = 2'b0;
-assign m_io_oeb[17:2] = {16{cw_dir}}; // try to invert
-assign m_io_oeb[19:18] = 2'b11;
-assign m_io_oeb[21:20] = 2'b00;
-assign m_io_oeb[25:22] = 4'b1111;
+assign m_io_oeb[7:0] = gpio_dir;
+assign m_io_oeb[9:8] = 2'b0;
+assign m_io_oeb[25:10] = {16{cw_dir}};
 assign m_io_oeb[27:26] = 2'b11;
-assign m_io_oeb[28] = 1'b0;
-assign m_io_oeb[36:29] = gpio_dir;
-assign m_io_oeb[`MPRJ_IO_PADS-1:37] = {`MPRJ_IO_PADS-37{1'b1}};
+assign m_io_oeb[29:28] = 2'b00;
+assign m_io_oeb[33:30] = 4'b1111;
+assign m_io_oeb[35:34] = 2'b11;
+assign m_io_oeb[36] = 1'b0;
+assign m_io_oeb[37] = 1'b0;
 
 assign inner_embed_mode = embed_mode;
 assign inner_disable = core_disable;

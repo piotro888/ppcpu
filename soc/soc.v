@@ -100,16 +100,17 @@ wire cw_err;
 wire cw_clk;
 wire cw_rst;
 
-assign cw_req = m_io_out[0];
-assign cw_dir = m_io_out[1];
-assign cw_io_o = m_io_out[17:2];
-assign m_io_in[17:2] = cw_io_i;
-assign m_io_in[18] = cw_ack;
-assign m_io_in[19] = cw_err;
-assign cw_clk = m_io_out[20];
-assign cw_rst = m_io_out[21];
-assign m_io_in[22] = m_irq;
-assign m_io_in[23] = 1'b0; // split clock
+localparam CW_PIN_OFF=8;
+assign cw_req = m_io_out[CW_PIN_OFF+0];
+assign cw_dir = m_io_out[CW_PIN_OFF+1];
+assign cw_io_o = m_io_out[CW_PIN_OFF+17:CW_PIN_OFF+2];
+assign m_io_in[CW_PIN_OFF+17:CW_PIN_OFF+2] = cw_io_i;
+assign m_io_in[CW_PIN_OFF+18] = cw_ack;
+assign m_io_in[CW_PIN_OFF+19] = cw_err;
+assign cw_clk = m_io_out[CW_PIN_OFF+20];
+assign cw_rst = m_io_out[CW_PIN_OFF+21];
+assign m_io_in[CW_PIN_OFF+22] = m_irq;
+assign m_io_in[CW_PIN_OFF+23] = 1'b0; // split clock
 
 wire wb_cyc;
 wire wb_stb;
@@ -339,7 +340,7 @@ end
 
 serialout r0_leds (
     .clk(d_clk),
-    .data(dbg_r0[7:0]),
+    .data(dbg_pc[7:0]),
     .sclk(ser_clk),
     .sdata(ser_data)
 );
