@@ -54,8 +54,6 @@ module interconnect_inner (
     input c0_o_mem_long_mode,
     input [7:0] c0_o_mem_high_addr,
     output [`RW-1:0] c0_i_core_int_sreg,
-    input [35:0] c0_dbg_out,
-    output [3:0] c0_dbg_in,
 
     // CORE 1
     output c1_clk,
@@ -83,8 +81,6 @@ module interconnect_inner (
     input c1_o_mem_long_mode,
     input [7:0] c1_o_mem_high_addr,
     output [`RW-1:0] c1_i_core_int_sreg,
-    input [35:0] c1_dbg_out,
-    output [3:0] c1_dbg_in,
 
     // ICACHE 0
     output ic0_clk,

@@ -50,6 +50,8 @@ always @(posedge i_clk) begin
         state <= STATE_IDLE;
         bit_cnt <= 'b0;
         spi_miso <= 1'b1;
+        wb_cyc <= 1'b0;
+        wb_stb <= 1'b0;
     end else if (sclk_edge) begin
         if (state == STATE_IDLE) begin
             spi_miso <= 1'b1;

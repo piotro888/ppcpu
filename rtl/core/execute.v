@@ -59,11 +59,7 @@ module execute #(parameter CORENO = 0, INT_VEC = 1) (
     output o_c_instr_long_mode,
     output reg o_mem_long_mode,
     output [7:0] o_instr_addr_high,
-    output reg [7:0] o_mem_addr_high,
-
-    output [32:0] dbg_out,
-    input dbg_hold,
-    input [`REGNO_LOG-1:0] dbg_reg_sel
+    output reg [7:0] o_mem_addr_high
 );
 
 reg next_ready_delayed;
@@ -77,7 +73,7 @@ wire raw_hazard = (
 
 wire i_invalidate = i_flush | irq | pc_high_updated;
 // hazard doesn't invalidate instructions, only holds it
-wire hold_req = raw_hazard | dbg_hold | alu_mul_busy;
+wire hold_req = raw_hazard | alu_mul_busy;
 
 wire i_valid = i_submit & ~i_invalidate;
 reg hold_valid;
@@ -337,7 +333,7 @@ always @* begin
             sreg_scratch_ie = c_sreg_store;
         end
         `SREG_CPUID: begin
-            sreg_out = 16'b1111_0000_0011_0010;
+            sreg_out = 16'b1110_0000_0001_0001;
         end
         `SREG_COREID: begin
             sreg_out = CORENO;

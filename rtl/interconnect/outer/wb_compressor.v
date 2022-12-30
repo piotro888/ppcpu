@@ -59,6 +59,8 @@ always @(posedge i_clk) begin
         state <= `S_IDLE;
         wb_ack <= 1'b0;
         cw_req <= 1'b0;
+        cw_dir <= 1'b0;
+        cw_io_o <= 'b0;
     end else begin
         case (state) 
             default: begin

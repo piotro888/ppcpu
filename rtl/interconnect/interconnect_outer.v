@@ -31,6 +31,8 @@ module interconnect_outer (
     // IRQ
     output [2:0] irq,
 
+    // Independent clock (on independent integer divider)
+    input user_clock2,
 
     // Lower Interconnect
     output inner_clock, inner_reset,
@@ -48,18 +50,26 @@ module interconnect_outer (
 
     // Internal ram
     output iram_clk,
-    output [8:0] iram_addr,
-    output [`RW-1:0] iram_i_data,
-    input  [`RW-1:0] iram_o_data,
-    output iram_we
+    output [7:0] iram_addr,
+    output [31:0] iram_i_data,
+    input  [31:0] iram_o_data,
+    output iram_we, iram_csb,
+    output [3:0] iram_w_mask,
+    input iram1_clk,
+    output [7:0] iram1_addr,
+    input  [31:0] iram1_dout,
+    input iram1_csb
 );
 
-wire soc_clock = mgt_wb_clk_i;
+// Use user_clock2 as clock. It can be used independently from mgmt cpu and is not limited to 40Mhz by it.
+// Wishbone port is not used, it is the same. Default freq is 10MHz
+wire soc_clock = user_clock2;
 wire soc_reset = mgt_wb_rst_i;
 
 wire core_clock = soc_clock;
 wire soft_reset = (~la_oenb[0]) & la_data_in[0]; // in future & embed mode
-wire core_reset = soc_reset | soft_reset;
+wire core_reset_us = soc_reset | soft_reset;
+wire core_reset; // synced
 
 assign inner_clock = core_clock;
 assign inner_reset = core_reset;
@@ -111,8 +121,10 @@ assign m_io_oeb[35:34] = 2'b11;
 assign m_io_oeb[36] = 1'b0;
 assign m_io_oeb[37] = 1'b0;
 
-assign inner_embed_mode = embed_mode;
-assign inner_disable = core_disable;
+assign inner_embed_mode = embed_mode_synced;
+assign inner_disable = core_disable_synced;
+
+assign irq = 2'b00;
 
 // CLOCKING
 `define CLK_DIV_ADDR `WB_ADDR_W'h001001
@@ -126,7 +138,7 @@ clk_div clk_div (
     .o_clk(cw_clk),
     .div(m_wb_o_dat[3:0]),
     .div_we(clk_div_write),
-    .clock_sel(cs_split_clock)
+    .clock_sel(cs_split_clock_synced)
 );
 
 // WISHBONE CLOCK DOMAIN CROSSING
@@ -196,17 +208,17 @@ wire cw_out_wb_ack;
 wire cw_out_wb_err;
 wire [`RW-1:0] cw_out_wb_i_dat;
 
-assign cw_mux_wb_cyc = (cs_split_clock ? cwclk_wb_cyc : m_wb_cyc);
-assign cw_mux_wb_stb = (cs_split_clock ? cwclk_wb_stb : m_wb_stb);
-assign cw_mux_wb_o_dat = (cs_split_clock ? cwclk_wb_o_dat : m_wb_o_dat);
-assign cw_mux_wb_adr = (cs_split_clock ? cwclk_wb_adr : m_wb_adr);
-assign cw_mux_wb_we = (cs_split_clock ? cwclk_wb_we : m_wb_we);
-assign cw_mux_wb_sel = (cs_split_clock ? cwclk_wb_sel : m_wb_sel);
-assign cw_mux_wb_8_burst = (cs_split_clock ? cwclk_wb_8_burst : m_wb_8_burst);
-assign cw_mux_wb_4_burst = (cs_split_clock ? cwclk_wb_4_burst : m_wb_4_burst);
-assign cw_out_wb_ack = (cs_split_clock ? m_wb_ack_cross : cw_mux_wb_ack);
-assign cw_out_wb_err = (cs_split_clock ? m_wb_err_cross  : cw_mux_wb_err);
-assign cw_out_wb_i_dat = (cs_split_clock ? m_wb_i_dat_cross  : cw_mux_wb_i_dat);
+assign cw_mux_wb_cyc = (cs_split_clock_synced ? cwclk_wb_cyc : m_wb_cyc);
+assign cw_mux_wb_stb = (cs_split_clock_synced ? cwclk_wb_stb : m_wb_stb);
+assign cw_mux_wb_o_dat = (cs_split_clock_synced ? cwclk_wb_o_dat : m_wb_o_dat);
+assign cw_mux_wb_adr = (cs_split_clock_synced ? cwclk_wb_adr : m_wb_adr);
+assign cw_mux_wb_we = (cs_split_clock_synced ? cwclk_wb_we : m_wb_we);
+assign cw_mux_wb_sel = (cs_split_clock_synced ? cwclk_wb_sel : m_wb_sel);
+assign cw_mux_wb_8_burst = (cs_split_clock_synced ? cwclk_wb_8_burst : m_wb_8_burst);
+assign cw_mux_wb_4_burst = (cs_split_clock_synced ? cwclk_wb_4_burst : m_wb_4_burst);
+assign cw_out_wb_ack = (cs_split_clock_synced ? m_wb_ack_cross : cw_mux_wb_ack);
+assign cw_out_wb_err = (cs_split_clock_synced ? m_wb_err_cross  : cw_mux_wb_err);
+assign cw_out_wb_i_dat = (cs_split_clock_synced ? m_wb_i_dat_cross  : cw_mux_wb_i_dat);
 
 
 // CW BUS CONVERTER
@@ -358,10 +370,14 @@ wishbone_arbiter m_arbiter (
 wire [`RW-1:0] iram_wb_i_dat;
 
 assign iram_clk = core_clock;
-assign iram_addr = m_wb_adr[8:0];
-assign iram_i_data = m_wb_o_dat;
-assign iram_wb_i_dat = iram_o_data;
+assign iram_addr = m_wb_adr[7:0];
+assign iram_i_data = {16'b0,m_wb_o_dat};
+assign iram_wb_i_dat = iram_o_data[15:0];
 assign iram_we = m_wb_cyc & m_wb_stb & m_wb_we & wb_tsel_iram;
+assign iram_csb = 1'b1;
+assign iram1_clk = 1'b0;
+assign iram1_csb = 1'b0;
+assign iram1_addr = 1'b0;
 
 reg iram_wb_ack;
 always @(posedge core_clock) begin
@@ -373,7 +389,7 @@ end
 `define NE_INTMEM_BEGIN 24'h7ffe00
 `define E_PROG_START    24'h800000
 `define E_MEM_START     24'h100000
-`define INTMEM_SIZE     24'h200
+`define INTMEM_SIZE     24'h100
 `define GPIO_START      24'h001010
 `define GPIO_END        24'h001012
 
@@ -415,9 +431,20 @@ reset_sync rst_cw_sync (
     .vccd1(vccd1), .vssd1(vssd1),
 `endif
     .i_clk(cw_clk),
-    .i_rst(soc_reset),
+    .i_rst(core_reset_us),
     .o_rst(cw_rst)
 );
+
+reset_sync rst_soc_sync (
+`ifdef USE_POWER_PINS
+    .vccd1(vccd1), .vssd1(vssd1),
+`endif
+    .i_clk(soc_clock),
+    .i_rst(core_reset_us),
+    .o_rst(core_reset)
+);
+
+// sync external gpio signals
 
 assign inner_ext_irq = irq_s_ff[1];
 reg [1:0] irq_s_ff;
@@ -426,5 +453,26 @@ always @(posedge core_clock) begin
     irq_s_ff[1] <= irq_s_ff[0]; 
 end
 
+wire cs_split_clock_synced = split_s_ff[1];
+wire core_disable_synced = disable_s_ff[1];
+wire embed_mode_synced = embed_s_ff[1];
+
+reg [1:0] split_s_ff;
+always @(posedge core_clock) begin
+    split_s_ff[0] <= cs_split_clock;
+    split_s_ff[1] <= split_s_ff[0]; 
+end
+
+reg [1:0] disable_s_ff;
+always @(posedge core_clock) begin
+    disable_s_ff[0] <= core_disable;
+    disable_s_ff[1] <= disable_s_ff[0]; 
+end
+
+reg [1:0] embed_s_ff;
+always @(posedge core_clock) begin
+    embed_s_ff[0] <= embed_mode;
+    embed_s_ff[1] <= embed_s_ff[0]; 
+end
 
 endmodule

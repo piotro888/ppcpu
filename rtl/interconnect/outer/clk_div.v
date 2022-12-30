@@ -40,8 +40,7 @@ end
 
 always @(posedge i_clk) begin
     if(i_rst) begin
-       // curr_div <= `MAX_DIV_LOG'b110;
-                curr_div <= `MAX_DIV_LOG'b01;
+        curr_div <= `MAX_DIV_LOG'b0101; // default caravel clock is 10MHz / 2**(5+1)=150kHz 
         next_div_val <= 1'b0;
     end else begin
         if(cnt[curr_div] & next_div_val) begin
