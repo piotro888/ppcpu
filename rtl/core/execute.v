@@ -93,6 +93,8 @@ assign o_ready = exec_submit | ~instr_valid;
 wire irq = ((i_irq | i_core_int) & irq_en) | prev_sys | trap_exception | i_mem_exception;
 // core_int is masked as externel event to not interrupt irq handler
 
+wire multicycle_submit = (i_valid & ~raw_hazard) | (instr_valid & ~raw_hazard & ~multicycle_submited);
+
 always @(posedge i_clk) begin
     if(i_rst) begin
         hold_valid <= 1'b0;
@@ -161,7 +163,7 @@ alu_mul_div alu_mul_div (
     .i_rst(i_rst),
 
     .i_a(alu_l_bus), .i_b(alu_r_bus), .o_d(alu_mul_res),
-    .i_submit(mul_div_op & i_submit), .i_flush(i_invalidate),
+    .i_submit(mul_div_op & multicycle_submit), .i_flush(i_invalidate),
     .o_busy(alu_mul_busy),
     .i_mul(c_alu_mode == `ALU_MODE_MUL),
     .i_div(c_alu_mode == `ALU_MODE_DIV),
@@ -288,6 +290,17 @@ always @(posedge i_clk) begin
         mem_stage_pc <= `RW'b0;
     else if (exec_submit)
         mem_stage_pc <= pc_val;
+end
+
+reg multicycle_submited;
+always @(posedge i_clk) begin
+    if (i_rst) begin
+        multicycle_submited <= 1'b0;
+    end else if (multicycle_submit) begin
+        multicycle_submited <= 1'b1;
+    end else if (i_submit) begin
+        multicycle_submited <= 1'b0;
+    end
 end
 
 // Special registers
