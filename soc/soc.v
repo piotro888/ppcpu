@@ -29,7 +29,11 @@ module soc (
     output spi_sck,
     output spi_mosi,
     input spi_miso,
-    output [1:0] spi_ss
+    output [1:0] spi_ss,
+
+    output vga_hsync, vga_vsync,
+    output [2:0] vga_r, vga_g,
+    output [1:0] vga_b
 );
 
 reg por_n = 1'b0;
@@ -161,6 +165,9 @@ localparam IRQC_END =   24'h00200e;
 
 localparam SPI_BASE =  24'h002010;
 localparam SPI_END =   24'h002014;
+
+localparam VGA_BASE =  24'h003000;
+localparam VGA_END =   24'h006002;
 
 localparam SDRAM_BASE = 24'h100000; 
 localparam SDRAM_END =  24'hffdfff;
@@ -308,6 +315,25 @@ spi spi (
     .wb_ack(spi_wb_ack)
 );
 
+wire vga_wb_ack;
+vga vga (
+    .raw_clk(i_clk),
+    .cpu_clk(cw_clk),
+
+    .hsync(vga_vsync),
+    .vsync(vga_hsync),
+    .r(vga_r),
+    .g(vga_g),
+    .b(vga_b),
+
+    .wb_cyc(wb_cyc),
+    .wb_stb(wb_stb & (wb_adr >= VGA_BASE && wb_adr <= VGA_END)),
+    .wb_adr(wb_adr - VGA_BASE),
+    .wb_we(wb_we),
+    .wb_i_dat(wb_o_dat),
+    .wb_ack(vga_wb_ack)
+);
+
 always @(*) begin
     if ((wb_adr >= UART_BASE) && (wb_adr <= UART_END)) begin
         wb_i_dat = uart_wb_i_dat;
@@ -324,6 +350,10 @@ always @(*) begin
     end else if ((wb_adr >= SPI_BASE) && (wb_adr <= SPI_END)) begin
         wb_i_dat = spi_wb_i_dat;
         wb_ack = spi_wb_ack;
+        wb_err = 1'b0;
+    end else if ((wb_adr >= VGA_BASE) && (wb_adr <= VGA_END)) begin
+        wb_i_dat = 16'b0;
+        wb_ack = vga_wb_ack;
         wb_err = 1'b0;
     end else if ((wb_adr >= SDRAM_BASE) && (wb_adr <= SDRAM_END)) begin
         wb_i_dat = sdram_data_out;
