@@ -8,6 +8,8 @@
 `define WB_DATA_W 16 
 `define WB_SEL_BITS 2
 
+`define TOP_DEBUG
+
 module top (
     // IOs
     input  [`MPRJ_IO_PADS-1:0] m_io_in,
@@ -33,6 +35,11 @@ module top (
 
     // IRQ
     output [2:0] irq
+
+`ifdef TOP_DEBUG
+    ,output [15:0] dbg_r0,
+    output [15:0] dbg_pc
+`endif
 );
 
 /*
@@ -401,5 +408,10 @@ int_ram int_ram (
     .o_data(iram_o_data),
     .i_we(iram_we)
 );
+
+`ifdef TOP_DEBUG
+    assign dbg_r0 = c0_dbg_r0;
+    assign dbg_pc = c0_dbg_pc;
+`endif
 
 endmodule

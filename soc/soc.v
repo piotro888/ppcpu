@@ -82,7 +82,9 @@ top top (
     .mgt_wb_ack_o(ignored_wb_ack),
     .mgt_wb_dat_o(ignored_wb_dat_o),
     .la_data_out(ignored_data_out),
-    .irq(ignored_irq)
+    .irq(ignored_irq),
+    .dbg_r0(dbg_r0),
+    .dbg_pc(dbg_pc)
 );
 
 wire [31:0] ignored_wb_dat_o;
@@ -340,7 +342,7 @@ end
 
 serialout r0_leds (
     .clk(d_clk),
-    .data(dbg_pc[7:0]),
+    .data(dbg_r0[7:0]),
     .sclk(ser_clk),
     .sdata(ser_data)
 );
