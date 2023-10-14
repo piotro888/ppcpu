@@ -23,8 +23,13 @@ module soc (
     output ser_clk,
     output ser_data,
 
-    input uart_rx,
-    output uart_tx,
+    input uart_rx, uart2_rx,
+    output uart_tx, uart2_tx,
+
+    inout scl,
+    inout sda,
+
+    input ps_clk, ps_data,
 
     output spi_sck,
     output spi_mosi,
@@ -157,6 +162,9 @@ wb_decomp wb_decomp (
 localparam UART_BASE =  24'h002000;
 localparam UART_END =   24'h002003;
 
+localparam UART2_BASE = 24'h002004;
+localparam UART2_END =  24'h002007;
+
 localparam TIMER_BASE = 24'h002008;
 localparam TIMER_END =  24'h00200a;
 
@@ -165,6 +173,12 @@ localparam IRQC_END =   24'h00200e;
 
 localparam SPI_BASE =  24'h002010;
 localparam SPI_END =   24'h002014;
+
+localparam KBD_BASE =  24'h002020;
+localparam KBD_END =   24'h002020;
+
+localparam I2C_BASE =  24'h002026;
+localparam I2C_END =   24'h00202a;
 
 localparam VGA_BASE =  24'h003000;
 localparam VGA_END =   24'h006002;
@@ -260,6 +274,25 @@ uart uart (
     .wb_ack(uart_wb_ack)
 );
 
+wire [`WB_DATA_W-1:0] uart2_wb_i_dat;
+wire uart2_wb_ack;
+uart2 uart2 (
+    .i_clk(cw_clk),
+    .i_full_clk(i_clk),
+    .i_rst(d_rst),
+
+    .tx(uart2_tx),
+    .rx(uart2_rx),
+
+    .wb_cyc(wb_cyc),
+    .wb_stb(wb_stb & ((wb_adr >= UART2_BASE) && (wb_adr <= UART2_END))),
+    .wb_adr(wb_adr - UART2_BASE),
+    .wb_we(wb_we),
+    .wb_i_dat(wb_o_dat),
+    .wb_o_dat(uart2_wb_i_dat),
+    .wb_ack(uart2_wb_ack)
+);
+
 wire timer_irq, timer_wb_ack;
 wire [`WB_DATA_W-1:0] timer_wb_i_dat;
 timer timer (
@@ -277,6 +310,7 @@ timer timer (
     .wb_ack(timer_wb_ack)
 );
 
+wire ps2_irq;
 wire m_irq, irqc_wb_ack;
 wire [`WB_DATA_W-1:0] irqc_wb_i_dat;
 irq_ctrl irq_ctrl (
@@ -284,7 +318,7 @@ irq_ctrl irq_ctrl (
     .i_rst(d_rst),
 
     .o_irq(m_irq),
-    .i_irq({15'b0, timer_irq}),
+    .i_irq({14'b0, ps2_irq, timer_irq}),
 
     .wb_cyc(wb_cyc),
     .wb_stb(wb_stb & (wb_adr >= IRQC_BASE && wb_adr <= IRQC_END)),
@@ -334,39 +368,99 @@ vga vga (
     .wb_ack(vga_wb_ack)
 );
 
+wire [7:0] ps2_wb_i_dat;
+ps2_kbd ps2_kbd (
+    .clk(cw_clk),
+    
+    .ps_clk(ps_clk),
+    .ps_data(ps_data),
+
+    .scancode_sync(ps2_wb_i_dat),
+    .irq_sync(ps2_irq)
+);
+
+wire i2c_wb_ack;
+wire [`WB_DATA_W-1:0] i2c_wb_i_dat;
+
+wire o_sda, d_sda;
+wire o_scl;
+wire i_scl = scl;
+assign scl = o_scl ? 1'bZ : 1'b0;
+assign sda = d_sda ? 1'bZ : o_sda;
+
+i2c i2c (
+    .i_clk(cw_clk),
+    .i_full_clk(i_clk),
+    .i_rst(d_rst),
+
+    .i_scl(i_scl),
+    .o_scl(o_scl),
+    .i_sda(sda),
+    .o_sda(o_sda),
+    .d_sda(d_sda),
+
+    .wb_cyc(wb_cyc),
+    .wb_stb(wb_stb & (wb_adr >= I2C_BASE && wb_adr <= I2C_END)),
+    .wb_adr(wb_adr - I2C_BASE),
+    .wb_we(wb_we),
+    .wb_i_dat(wb_o_dat),
+    .wb_o_dat(i2c_wb_i_dat),
+    .wb_ack(i2c_wb_ack)
+);
+
 always @(*) begin
-    if ((wb_adr >= UART_BASE) && (wb_adr <= UART_END)) begin
-        wb_i_dat = uart_wb_i_dat;
-        wb_ack = wb_cyc & wb_stb;
-        wb_err = 1'b0;
-    end else if ((wb_adr >= TIMER_BASE) && (wb_adr <= TIMER_END)) begin
-        wb_i_dat = timer_wb_i_dat;
-        wb_ack = timer_wb_ack;
-        wb_err = 1'b0;
-    end else if ((wb_adr >= IRQC_BASE) && (wb_adr <= IRQC_END)) begin
-        wb_i_dat = irqc_wb_i_dat;
-        wb_ack = irqc_wb_ack;
-        wb_err = 1'b0;
-    end else if ((wb_adr >= SPI_BASE) && (wb_adr <= SPI_END)) begin
-        wb_i_dat = spi_wb_i_dat;
-        wb_ack = spi_wb_ack;
-        wb_err = 1'b0;
-    end else if ((wb_adr >= VGA_BASE) && (wb_adr <= VGA_END)) begin
-        wb_i_dat = 16'b0;
-        wb_ack = vga_wb_ack;
-        wb_err = 1'b0;
-    end else if ((wb_adr >= SDRAM_BASE) && (wb_adr <= SDRAM_END)) begin
-        wb_i_dat = sdram_data_out;
-        wb_ack = sdram_ack;
-        wb_err = 1'b0;
-    end else if ((wb_adr >= ROM_BASE) && (wb_adr <= ROM_END)) begin
-        wb_i_dat = rom_data;
-        wb_ack = wb_cyc & wb_stb;
-        wb_err = 1'b0;
+    if (wb_adr >= SDRAM_BASE) begin
+        if ((wb_adr >= SDRAM_BASE) && (wb_adr <= SDRAM_END)) begin
+            wb_i_dat = sdram_data_out;
+            wb_ack = sdram_ack;
+            wb_err = 1'b0;
+        end else if ((wb_adr >= ROM_BASE) && (wb_adr <= ROM_END)) begin
+            wb_i_dat = rom_data;
+            wb_ack = wb_cyc & wb_stb;
+            wb_err = 1'b0;
+        end else begin
+            wb_i_dat = 16'b0;
+            wb_ack = 1'b0;
+            wb_err = 1'b1;
+        end
     end else begin
-        wb_i_dat = 16'b0;
-        wb_ack = 1'b0;
-        wb_err = 1'b1;
+        if ((wb_adr >= UART_BASE) && (wb_adr <= UART_END)) begin
+            wb_i_dat = uart_wb_i_dat;
+            wb_ack = wb_cyc & wb_stb;
+            wb_err = 1'b0;
+        end else if ((wb_adr >= UART2_BASE) && (wb_adr <= UART2_END)) begin
+            wb_i_dat = uart2_wb_i_dat;
+            wb_ack = wb_cyc & wb_stb;
+            wb_err = 1'b0;
+        end else if ((wb_adr >= TIMER_BASE) && (wb_adr <= TIMER_END)) begin
+            wb_i_dat = timer_wb_i_dat;
+            wb_ack = timer_wb_ack;
+            wb_err = 1'b0;
+        end else if ((wb_adr >= IRQC_BASE) && (wb_adr <= IRQC_END)) begin
+            wb_i_dat = irqc_wb_i_dat;
+            wb_ack = irqc_wb_ack;
+            wb_err = 1'b0;
+        end else if ((wb_adr >= SPI_BASE) && (wb_adr <= SPI_END)) begin
+            wb_i_dat = spi_wb_i_dat;
+            wb_ack = spi_wb_ack;
+            wb_err = 1'b0;
+        end else if ((wb_adr >= KBD_BASE) && (wb_adr <= KBD_END)) begin
+            wb_i_dat = {8'b0, ps2_wb_i_dat};
+            wb_ack = wb_cyc & wb_stb;
+            wb_err = 1'b0;
+        end else if ((wb_adr >= I2C_BASE) && (wb_adr <= I2C_END)) begin
+            wb_i_dat = i2c_wb_i_dat;
+            wb_ack = i2c_wb_ack;
+            wb_err = 1'b0;
+        end else if ((wb_adr >= VGA_BASE) && (wb_adr <= VGA_END)) begin
+            wb_i_dat = 16'b0;
+            wb_ack = vga_wb_ack;
+            wb_err = 1'b0;
+        end else begin
+            wb_i_dat = 16'b0;
+            wb_ack = 1'b0;
+            wb_err = 1'b1;
+        end
     end
 end
 
