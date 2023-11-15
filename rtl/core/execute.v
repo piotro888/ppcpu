@@ -396,7 +396,9 @@ register sreg_irq_pc (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif
-    .i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_pc_ie ? sreg_in : (i_mem_exception ? mem_stage_pc : (c_wfi ? pc_val+16'b1 : pc_val))), .o_d(sreg_irq_pc_out), .i_ie(irq | (sreg_irq_pc_ie & exec_submit)));
+    .i_clk(i_clk), .i_rst(i_rst),
+    .i_d(i_mem_exception ? mem_stage_pc : (c_wfi ? pc_val+16'b1 : (irq ? pc_val : sreg_in))), .o_d(sreg_irq_pc_out), .i_ie(irq | (sreg_irq_pc_ie & exec_submit))
+);
 
 wire [2:0] sreg_jtr_buff_o, sreg_jtr_out;
 wire jtr_jump_en = (pc_sreg_ie | jump_dec_valid | c_sreg_irt) & exec_submit;
