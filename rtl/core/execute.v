@@ -28,7 +28,7 @@ module execute #(parameter CORENO = 0, INT_VEC = 1) (
     input [`JUMP_CODE_W-1:0] c_jump_cond_code,
     input c_mem_access, c_mem_we, c_mem_width,
     input [1:0] c_used_operands,
-    input c_sreg_load, c_sreg_store, c_sreg_jal_over, c_sreg_irt, c_sys, c_mem_long,
+    input c_sreg_load, c_sreg_store, c_sreg_jal_over, c_sreg_irt, c_sys, c_mem_long, c_wfi,
 
     // Signals to fetch stage to handle mispredictions
     output o_pc_update,
@@ -83,7 +83,7 @@ wire i_valid = i_submit & ~i_invalidate;
 reg hold_valid;
 
 wire instr_valid = i_valid | (hold_valid & ~i_submit & ~i_invalidate);
-wire exec_submit = i_next_ready & instr_valid & ~hold_req;
+wire exec_submit = i_next_ready & instr_valid & ~hold_req & ~c_wfi;
 
 // don't update state when current instruction is not valid (flush or bubble)
 assign o_ready = exec_submit | ~instr_valid;
@@ -396,7 +396,7 @@ register sreg_irq_pc (
 `ifdef USE_POWER_PINS
     .vccd1(vccd1), .vssd1(vssd1),
 `endif
-    .i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_pc_ie ? sreg_in : (i_mem_exception ? mem_stage_pc : pc_val)), .o_d(sreg_irq_pc_out), .i_ie(irq | (sreg_irq_pc_ie & exec_submit)));
+    .i_clk(i_clk), .i_rst(i_rst), .i_d(sreg_irq_pc_ie ? sreg_in : (i_mem_exception ? mem_stage_pc : (c_wfi ? pc_val+16'b1 : pc_val))), .o_d(sreg_irq_pc_out), .i_ie(irq | (sreg_irq_pc_ie & exec_submit)));
 
 wire [2:0] sreg_jtr_buff_o, sreg_jtr_out;
 wire jtr_jump_en = (pc_sreg_ie | jump_dec_valid | c_sreg_irt) & exec_submit;

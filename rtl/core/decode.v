@@ -32,7 +32,7 @@ module decode (
     output reg oc_mem_access, oc_mem_we, oc_mem_width,
     output reg [1:0] oc_used_operands,
     output reg oc_sreg_load, oc_sreg_store, oc_sreg_jal_over, oc_sreg_irt, oc_sys,
-    output reg oc_mem_long,
+    output reg oc_mem_long, oc_wfi,
 
     output dbg_out
 );
@@ -84,6 +84,7 @@ module decode (
 `define OPC_LL8 7'h2a
 `define OPC_SL8 7'h2b
 `define OPC_MOD 7'h2c
+`define OPC_WFI 7'h2d
 // sreg imm??
 
 wire [6:0] opcode = i_instr_l[6:0];
@@ -101,13 +102,13 @@ reg [`REGNO-1:0] c_rf_ie;
 reg [`JUMP_CODE_W-1:0] c_jump_cond_code;
 reg c_mem_access, c_mem_we, c_mem_width;
 reg [1:0] c_used_operands;
-reg c_sreg_load, c_sreg_store, c_sreg_jal_over, c_sreg_irt, c_sys, c_mem_long;
+reg c_sreg_load, c_sreg_store, c_sreg_jal_over, c_sreg_irt, c_sys, c_mem_long, c_wfi;
 
 always @(*) begin
     // defaults
     c_pc_inc = 1'b1;
     {c_pc_ie, c_r_bus_imm, c_alu_carry_en, c_alu_flags_ie, c_mem_access,
-        c_mem_we, c_sreg_load, c_sreg_store, c_sreg_jal_over, c_sreg_irt, c_sys, c_mem_width, c_mem_long} = 13'b0;
+        c_mem_we, c_sreg_load, c_sreg_store, c_sreg_jal_over, c_sreg_irt, c_sys, c_mem_width, c_mem_long, c_wfi} = 14'b0;
     c_rf_ie = `REGNO'b0;
     c_alu_mode = `ALU_MODE_W'b0;
     c_l_reg_sel = `REGNO_LOG'b0;
@@ -459,6 +460,10 @@ always @(*) begin
             c_rf_ie[reg_dst] = 1'b1;
             c_used_operands = 2'b11;
         end
+        `OPC_WFI: begin
+            c_pc_inc = 1'b0;
+            c_wfi = 1'b1;
+        end
         default: begin
         end
     endcase
@@ -506,6 +511,7 @@ always @(posedge i_clk) begin
             oc_sreg_irt <= c_sreg_irt;
             oc_sys <= c_sys;
             oc_mem_long <= c_mem_long;
+            oc_wfi <= c_wfi;
         end
 
         if (i_submit & ~i_next_ready & ~i_flush) begin
