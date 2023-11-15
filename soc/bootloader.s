@@ -91,7 +91,7 @@ load_data_mem:
     load_loop:
         jal r6, getc16
         sto r0, r5, 0
-        add r1, r1, r0s
+        add r1, r1, r0
 
         adi r5, r5, 2 
         cmi r5, 0x1000
