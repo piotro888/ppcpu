@@ -9,7 +9,7 @@ module decode (
     input wire i_clk,
     input wire i_rst,
 
-    input [15:0] i_instr_l,
+    input [19:0] i_instr_l,
     input [`I_SIZE-17:0] i_imm_pass,
     output reg [`I_SIZE-17:0] o_imm_pass,
     input i_jmp_pred_pass,
@@ -67,7 +67,7 @@ module decode (
 `define OPC_SHL 7'h19
 `define OPC_SHR 7'h1a
 `define OPC_CAI 7'h1b
-`define OPC_MUL 7'h1c // Temporary instructions (MUL,DIV) to be removed after compiler patch
+`define OPC_MUL 7'h1c
 `define OPC_DIV 7'h1d
 `define OPC_IRT 7'h1e
 `define OPC_LD8 7'h1f
@@ -87,9 +87,9 @@ module decode (
 // sreg imm??
 
 wire [6:0] opcode = i_instr_l[6:0];
-wire [2:0] reg_dst = i_instr_l[9:7];
-wire [2:0] reg_st = i_instr_l[12:10];
-wire [2:0] reg_nd = i_instr_l[15:13];
+wire [3:0] reg_dst = i_instr_l[10:7];
+wire [3:0] reg_st = i_instr_l[14:11];
+wire [3:0] reg_nd = i_instr_l[19:16];
 
 // Comb output signals
 reg c_pc_inc, c_pc_ie;
@@ -152,7 +152,7 @@ always @(*) begin
             c_used_operands = 2'b10;
         end
         `OPC_STO: begin
-            c_l_reg_sel = reg_nd;
+            c_l_reg_sel = reg_dst; // format exception to fit in new format (rd is register offset for address, previously rs2)
             c_r_bus_imm = 1'b1;
             c_alu_mode = `ALU_MODE_ADD;
             c_r_reg_sel = reg_st;
@@ -364,7 +364,7 @@ always @(*) begin
             c_mem_width = 1'b1;
         end
         `OPC_SO8: begin
-            c_l_reg_sel = reg_nd;
+            c_l_reg_sel = reg_dst;
             c_r_bus_imm = 1'b1;
             c_alu_mode = `ALU_MODE_ADD;
             c_r_reg_sel = reg_st;
@@ -422,7 +422,7 @@ always @(*) begin
             c_used_operands = 2'b01;
         end
         `OPC_SLO: begin
-            c_l_reg_sel = reg_nd;
+            c_l_reg_sel = reg_dst;
             c_r_bus_imm = 1'b1;
             c_alu_mode = `ALU_MODE_ADD;
             c_r_reg_sel = reg_st;
@@ -442,7 +442,7 @@ always @(*) begin
             c_mem_width = 1'b1;
         end
         `OPC_SL8: begin
-            c_l_reg_sel = reg_nd;
+            c_l_reg_sel = reg_dst;
             c_r_bus_imm = 1'b1;
             c_alu_mode = `ALU_MODE_ADD;
             c_r_reg_sel = reg_st;

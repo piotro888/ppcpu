@@ -350,7 +350,7 @@ always @* begin
             sreg_scratch_ie = c_sreg_store;
         end
         `SREG_CPUID: begin
-            sreg_out = 16'b1111_0000_0011_0011;
+            sreg_out = 16'b1111_0000_0011_0100;
         end
         `SREG_COREID: begin
             sreg_out = CORENO;
